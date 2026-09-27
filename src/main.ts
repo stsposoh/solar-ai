@@ -81,12 +81,31 @@ function boot() {
   const nav = must<HTMLElement>('.nav')
   const progress = must<HTMLElement>('#progress')
   const video = must<HTMLVideoElement>('#reel')
+  const catsVideo = must<HTMLVideoElement>('#cats-reel')
+  let catsBusy = false
+  let catsTarget = 0
+  const scrubCats = (time: number) => {
+    catsTarget = time
+    if (catsBusy || Math.abs(catsVideo.currentTime - time) < 1 / 60) return
+    catsBusy = true
+    catsVideo.addEventListener(
+      'seeked',
+      () => {
+        catsBusy = false
+        if (Math.abs(catsVideo.currentTime - catsTarget) >= 1 / 60) scrubCats(catsTarget)
+      },
+      { once: true },
+    )
+    catsVideo.currentTime = time
+  }
   const heroEl = must<HTMLElement>('#top')
   const dualityEl = must<HTMLElement>('#duality')
   const processEl = must<HTMLElement>('#process')
   const objectEl = must<HTMLElement>('#object')
   const closeEl = must<HTMLElement>('#contact')
+  const wowEl = must<HTMLElement>('#wow')
   const cinemaEl = must<HTMLElement>('#showreel')
+  const catsEl = must<HTMLElement>('#cats')
   const manifestoEl = must<HTMLElement>('#manifesto')
   const threadEl = must<HTMLElement>('#thread')
   const threadSvg = must<SVGSVGElement>('#thread-svg')
@@ -151,6 +170,7 @@ function boot() {
   const servicesBoard = must<HTMLElement>('.services-board')
   const device = createDevice(must<HTMLCanvasElement>('#device'))
   const captions = [...cinemaEl.querySelectorAll<HTMLElement>('[data-caption]')]
+  const catLines = [...catsEl.querySelectorAll<HTMLElement>('[data-start]')]
   const steps = [...processEl.querySelectorAll<HTMLElement>('[data-step]')]
   const phases = [...objectEl.querySelectorAll<HTMLElement>('[data-phase]')]
   const reelTime = must<HTMLElement>('#reel-time')
@@ -189,6 +209,32 @@ function boot() {
       event.preventDefault()
       lenis.scrollTo(target, { offset: 0 })
     })
+  })
+
+  const industryStage = must<HTMLElement>('.industries-stage')
+  const industryCards = [...industryStage.querySelectorAll<HTMLElement>('.ind-card')]
+  const tiltCard = (card: HTMLElement, event: PointerEvent | null) => {
+    if (!event) {
+      card.style.setProperty('--tilt-x', '0deg')
+      card.style.setProperty('--tilt-y', '0deg')
+      card.style.setProperty('--shift-x', '0px')
+      card.style.setProperty('--shift-y', '0px')
+      return
+    }
+    const rect = card.getBoundingClientRect()
+    const dx = (event.clientX - (rect.left + rect.width / 2)) / rect.width
+    const dy = (event.clientY - (rect.top + rect.height / 2)) / rect.height
+    const near = Math.hypot(dx, dy) < 1.05
+    card.style.setProperty('--tilt-x', near ? `${(-dy * 7).toFixed(2)}deg` : '0deg')
+    card.style.setProperty('--tilt-y', near ? `${(dx * 9).toFixed(2)}deg` : '0deg')
+    card.style.setProperty('--shift-x', near ? `${(-dx * 14).toFixed(1)}px` : '0px')
+    card.style.setProperty('--shift-y', near ? `${(-dy * 10).toFixed(1)}px` : '0px')
+  }
+  industryStage.addEventListener('pointermove', (event) => {
+    industryCards.forEach((card) => tiltCard(card, event))
+  })
+  industryStage.addEventListener('pointerleave', () => {
+    industryCards.forEach((card) => tiltCard(card, null))
   })
 
   const track = must<HTMLElement>('#industries-track')
@@ -233,7 +279,9 @@ function boot() {
     const process = travel(processEl)
     const object = travel(objectEl)
     const close = travel(closeEl)
+    const wow = travel(wowEl)
     const cinema = travel(cinemaEl)
+    const cats = travel(catsEl)
     const manifesto = travel(manifestoEl)
 
     const glance: Glance = {
@@ -242,11 +290,13 @@ function boot() {
       process: process.presence,
       object: object.presence,
       close: close.presence,
+      wow: wow.presence,
       heroP: hero.p,
       dualityP: duality.p,
       processP: process.p,
       objectP: object.p,
       closeP: close.p,
+      wowP: wow.p,
       pointerX: pointer.x,
       pointerY: pointer.y,
       time,
@@ -258,7 +308,7 @@ function boot() {
 
     const max = document.documentElement.scrollHeight - window.innerHeight
     progress.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`
-    nav.classList.toggle('is-ink', cinema.presence > 0.55)
+    nav.classList.toggle('is-ink', cinema.presence > 0.55 || cats.presence > 0.4)
 
     const line = Math.min(lines.length - 1, Math.floor(manifesto.p * lines.length))
     lines.forEach((el, index) => el.classList.toggle('is-on', index === line && manifesto.presence > 0.05))
@@ -312,6 +362,19 @@ function boot() {
       const target = Math.min(video.duration - 0.05, Math.max(0.04, cinema.p * video.duration))
       if (Math.abs(video.currentTime - target) > 0.045) video.currentTime = target
       reelTime.textContent = `${(cinema.p * video.duration).toFixed(1)}s`
+    }
+
+    if (catsVideo.duration && cats.presence > 0.05) {
+      const target = Math.min(catsVideo.duration - 0.05, Math.max(0, cats.p * catsVideo.duration))
+      scrubCats(target)
+      const moment = cats.p * catsVideo.duration
+      catLines.forEach((el) => {
+        const start = Number(el.dataset.start)
+        const end = Number(el.dataset.end ?? catsVideo.duration)
+        el.classList.toggle('is-on', moment >= start && moment < end)
+      })
+    } else {
+      catLines.forEach((el) => el.classList.remove('is-on'))
     }
 
     document.body.classList.add('is-ready')
