@@ -78,7 +78,7 @@ export function createStorm() {
   scene.add(rain)
 
   const clouds: THREE.Mesh[] = []
-  new THREE.TextureLoader().load('/images/cloud-smoke.webp', (texture) => {
+  new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}images/cloud-smoke.webp`, (texture) => {
     const geometry = new THREE.PlaneGeometry(500, 500)
     for (let p = 0; p < 25; p += 1) {
       const material = new THREE.ShaderMaterial({

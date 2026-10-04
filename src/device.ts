@@ -44,9 +44,9 @@ export function createDevice(canvas: HTMLCanvasElement) {
     screenTex.image = picture
     screenTex.needsUpdate = true
   }
-  screenImage.src = '/images/solar-screen.webp'
+  screenImage.src = `${import.meta.env.BASE_URL}images/solar-screen.webp`
 
-  new GLTFLoader().load('/models/iphone.glb', (gltf) => {
+  new GLTFLoader().load(`${import.meta.env.BASE_URL}models/iphone.glb`, (gltf) => {
     const model = gltf.scene
     model.traverse((obj) => {
       const mesh = obj as THREE.Mesh

@@ -467,8 +467,8 @@ export function createWorld(
   const loadModels = () => {
     if (modelsRequested) return
     modelsRequested = true
-    loadModel('/models/camera.glb', cameraHolder, 2.35, 'camera')
-    loadModel('/models/boombox.glb', boomHolder, 1.55, 'boombox')
+    loadModel(`${import.meta.env.BASE_URL}models/camera.glb`, cameraHolder, 2.35, 'camera')
+    loadModel(`${import.meta.env.BASE_URL}models/boombox.glb`, boomHolder, 1.55, 'boombox')
   }
 
   const composerTarget = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType })
