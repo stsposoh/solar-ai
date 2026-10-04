@@ -14,6 +14,7 @@ export type Glance = {
   object: number
   close: number
   wow: number
+  thread: number
   heroP: number
   dualityP: number
   processP: number
@@ -459,7 +460,8 @@ export function createWorld(
     )
     const markScale =
       mixScalar(weights.map((entry) => ({ w: entry.w, v: entry.shot.markScale }))) *
-      (0.94 + 0.06 * smoothstep(0, 1.05, elapsed))
+      (0.94 + 0.06 * smoothstep(0, 1.05, elapsed)) *
+      (1 - smoothstep(0.12, 0.72, g.thread))
     const panelAmt = mixScalar(weights.map((entry) => ({ w: entry.w, v: entry.shot.panels })))
     const productAmt = mixScalar(weights.map((entry) => ({ w: entry.w, v: entry.shot.product })))
 

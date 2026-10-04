@@ -5,6 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { createWorld, type Glance, type ModelStatus } from './scene'
 import { createWeb } from './web'
 import { createDevice } from './device'
+import { createMetaballs } from './metaballs'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -169,6 +170,8 @@ function boot() {
   const serviceBlocks = [...document.querySelectorAll<HTMLElement>('.service')]
   const servicesBoard = must<HTMLElement>('.services-board')
   const device = createDevice(must<HTMLCanvasElement>('#device'))
+  const goo = createMetaballs(must<HTMLCanvasElement>('#goo'))
+  let gooHover = false
   const captions = [...cinemaEl.querySelectorAll<HTMLElement>('[data-caption]')]
   const catLines = [...catsEl.querySelectorAll<HTMLElement>('[data-start]')]
   const steps = [...processEl.querySelectorAll<HTMLElement>('[data-step]')]
@@ -190,6 +193,13 @@ function boot() {
   window.addEventListener('pointermove', (event) => {
     pointer.x = (event.clientX / window.innerWidth) * 2 - 1
     pointer.y = (event.clientY / window.innerHeight) * 2 - 1
+    const box = threadEl.getBoundingClientRect()
+    gooHover =
+      event.clientX >= box.left &&
+      event.clientX <= box.right &&
+      event.clientY >= box.top &&
+      event.clientY <= box.bottom
+    if (gooHover) goo.setPointer(event.clientX, event.clientY)
   })
 
   const lenis = new Lenis({
@@ -283,6 +293,12 @@ function boot() {
     const cinema = travel(cinemaEl)
     const cats = travel(catsEl)
     const manifesto = travel(manifestoEl)
+    const thread = travel(threadEl)
+    const threadBox = threadEl.getBoundingClientRect()
+    const leave = clamp((window.innerHeight - threadBox.bottom) / (window.innerHeight * 0.9), 0, 1)
+    const cover = Math.max(0, thread.presence * (1 - leave))
+    threadEl.style.setProperty('--veil', cover.toFixed(3))
+    goo.update(time, cover, thread.p, gooHover)
 
     const glance: Glance = {
       hero: hero.presence,
@@ -291,6 +307,7 @@ function boot() {
       object: object.presence,
       close: close.presence,
       wow: wow.presence,
+      thread: cover,
       heroP: hero.p,
       dualityP: duality.p,
       processP: process.p,
@@ -310,8 +327,13 @@ function boot() {
     progress.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`
     nav.classList.toggle('is-ink', cinema.presence > 0.55 || cats.presence > 0.4)
 
+    const rise = clamp((window.innerHeight * 0.78 - manifestoEl.getBoundingClientRect().top) / (window.innerHeight * 0.42), 0, 1)
+    manifestoEl.style.setProperty('--rise', rise.toFixed(3))
     const line = Math.min(lines.length - 1, Math.floor(manifesto.p * lines.length))
-    lines.forEach((el, index) => el.classList.toggle('is-on', index === line && manifesto.presence > 0.05))
+    lines.forEach((el, index) => {
+      const showFirst = index === 0 && line === 0 && rise > 0.04
+      el.classList.toggle('is-on', showFirst || (index === line && index > 0 && manifesto.presence > 0.05))
+    })
 
     const board = servicesBoard.getBoundingClientRect()
     const deviceProgress = clamp((window.innerHeight * 0.35 - board.top) / Math.max(board.height - window.innerHeight, 1), 0, 1)
@@ -390,6 +412,7 @@ function boot() {
     world.resize()
     web.resize()
     device.resize()
+    goo.resize()
     layoutThread()
     ScrollTrigger.refresh()
   })
