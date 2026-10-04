@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { createSolarLogo } from './logo'
 import { createScreenCanvas } from './screens'
 
 export type Glance = {
@@ -158,18 +159,6 @@ function fitObject(root: THREE.Object3D, target: number) {
   root.position.copy(center).multiplyScalar(-scale)
 }
 
-function capsuleShape(width: number, length: number) {
-  const radius = width / 2
-  const half = Math.max(length / 2 - radius, 0.001)
-  const shape = new THREE.Shape()
-  shape.moveTo(radius, -half)
-  shape.lineTo(radius, half)
-  shape.absarc(0, half, radius, 0, Math.PI, false)
-  shape.lineTo(-radius, -half)
-  shape.absarc(0, -half, radius, Math.PI, Math.PI * 2, false)
-  return shape
-}
-
 function markRoom(renderer: THREE.WebGLRenderer) {
   const env = new THREE.Scene()
   const wall = (color: string, position: [number, number, number], size: [number, number]) => {
@@ -194,42 +183,6 @@ function markRoom(renderer: THREE.WebGLRenderer) {
   const map = pmrem.fromScene(env, 0).texture
   pmrem.dispose()
   return map
-}
-
-function makeMark(envMap: THREE.Texture) {
-  const spin = new THREE.Group()
-  const metal = new THREE.MeshPhysicalMaterial({
-    color: '#18080a',
-    metalness: 1,
-    roughness: 0.12,
-    clearcoat: 1,
-    clearcoatRoughness: 0.03,
-    envMap,
-    envMapIntensity: 1.85,
-    reflectivity: 1,
-  })
-
-  const petal = new THREE.ExtrudeGeometry(capsuleShape(0.4, 1.02), {
-    depth: 0.68,
-    bevelEnabled: true,
-    bevelThickness: 0.08,
-    bevelSize: 0.055,
-    bevelSegments: 2,
-    curveSegments: 24,
-  })
-  petal.translate(0, 0, -0.34)
-
-  for (let i = 0; i < 6; i++) {
-    const arm = new THREE.Group()
-    arm.rotation.z = (i * Math.PI) / 3
-    const mesh = new THREE.Mesh(petal, metal)
-    mesh.position.y = 0.58
-    mesh.layers.set(1)
-    arm.add(mesh)
-    spin.add(arm)
-  }
-
-  return spin
 }
 
 function makePanels(renderer: THREE.WebGLRenderer) {
@@ -319,7 +272,7 @@ export function createWorld(
   const markPivot = new THREE.Group()
   const markTilt = new THREE.Group()
   markTilt.rotation.set(0.48, -0.34, 0)
-  const markSpin = makeMark(markRoom(renderer))
+  const markSpin = createSolarLogo(markRoom(renderer))
   markTilt.add(markSpin)
   markPivot.add(markTilt)
   scene.add(markPivot)
