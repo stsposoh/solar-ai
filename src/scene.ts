@@ -41,7 +41,7 @@ const SHOTS: Record<'rest' | 'hero' | 'duality' | 'process' | 'wow' | 'object' |
   hero: { cam: [0.15, 0.02, 6.2], look: [0.95, 0.38, 0], mark: [1.35, 0.42, 0], markScale: 0.86, panels: 0, product: 0 },
   duality: { cam: [0, 0.04, 5.9], look: [0, 0.28, 0], mark: [0, 0.28, 0], markScale: 0.78, panels: 0, product: 0 },
   process: { cam: [-0.35, 0.18, 8.2], look: [0.15, 0.02, 0], mark: [-4, 0, 0], markScale: 0.3, panels: 0, product: 0 },
-  wow: { cam: [0.15, 0.04, 7.2], look: [0.55, 0, 0], mark: [-7, 0.6, -2], markScale: 0, panels: 0, product: 0 },
+  wow: { cam: [0.85, 0.02, 6.5], look: [1.7, 0.02, 0], mark: [2.72, 0.02, 0], markScale: 0.98, panels: 0, product: 0 },
   object: { cam: [-0.35, 0.18, 5.8], look: [1.25, 0, 0], mark: [-3.6, -0.4, 0], markScale: 0, panels: 0, product: 1 },
   close: { cam: [0.1, 0.12, 6.4], look: [0.35, 0.15, 0], mark: [0.55, 0.22, 0], markScale: 0.5, panels: 0, product: 0 },
 }
@@ -332,26 +332,6 @@ export function createWorld(
   form.add(formLight)
   scene.add(form)
 
-  const sheetGeo = new THREE.PlaneGeometry(1.7, 2.7, 40, 52)
-  const sheetBase = new Float32Array(sheetGeo.attributes.position.array)
-  const sheetMat = new THREE.MeshPhysicalMaterial({
-    color: '#14080b',
-    metalness: 1,
-    roughness: 0.22,
-    clearcoat: 1,
-    clearcoatRoughness: 0.08,
-    emissive: '#ff2a18',
-    emissiveIntensity: 0.05,
-    side: THREE.DoubleSide,
-  })
-  const sheet = new THREE.Mesh(sheetGeo, sheetMat)
-  sheet.position.set(2.15, 0.05, 0)
-  sheet.visible = false
-  const sheetLight = new THREE.PointLight('#ff3a28', 0, 8, 1.5)
-  sheetLight.position.set(0.6, 0.8, 3.4)
-  sheet.add(sheetLight)
-  scene.add(sheet)
-
   const panels = makePanels(renderer)
   panels.group.visible = false
   scene.add(panels.group)
@@ -488,7 +468,7 @@ export function createWorld(
     dualityYaw += (yawTarget - dualityYaw) * (1 - Math.exp(-2.8 * dt))
     markTilt.rotation.x = 0.48 + smoothPointer.y * -0.04
     markTilt.rotation.y = -0.34 + smoothPointer.x * 0.05 + dualityYaw
-    markSpin.rotation.z = elapsed * 0.11 + g.heroP * 0.35 + g.dualityP * 0.85 + g.processP * 0.4
+    markSpin.rotation.z = elapsed * 0.11 + g.heroP * 0.35 + g.dualityP * 0.85 + g.processP * 0.4 + g.wowP * 0.55
 
     const coolBoost = g.duality > 0.25 ? 1.2 - g.dualityP * 0.75 : 1
     const hotBoost = g.duality > 0.25 ? 0.35 + g.dualityP * 0.95 : 1
@@ -546,33 +526,6 @@ export function createWorld(
 
     productKey.intensity = showProduct ? 36 * productAmt : 0
     productKey.target.position.copy(product.position)
-
-    const sheetShow = g.wow
-    sheet.visible = sheetShow > 0.2
-    sheet.scale.setScalar(0.4 + sheetShow * 0.6)
-    sheetLight.intensity = 22 * sheetShow
-    sheetMat.emissiveIntensity = 0.04 + sheetShow * 0.04
-    if (sheet.visible) {
-      const amp = 0.48
-      const positions = sheetGeo.attributes.position
-      for (let i = 0; i < positions.count; i++) {
-        const x = sheetBase[i * 3]
-        const y = sheetBase[i * 3 + 1]
-        const fold = Math.sin(x * 1.7 + elapsed * 0.75)
-        const bow = Math.cos(y * 1.15 - elapsed * 0.5) * 0.55
-        const ripple = Math.sin(x * 5 + y * 2 + elapsed) * 0.08
-        positions.setXYZ(
-          i,
-          x + Math.sin(y * 1.1 + elapsed * 0.5) * 0.12 * amp,
-          y + Math.cos(x * 1.6 - elapsed * 0.4) * 0.05 * amp,
-          (fold + bow + ripple) * amp,
-        )
-      }
-      positions.needsUpdate = true
-      sheetGeo.computeVertexNormals()
-      sheet.rotation.y = -0.28 + Math.sin(elapsed * 0.3) * 0.06 + g.pointerX * 0.08
-      sheet.rotation.x = Math.sin(elapsed * 0.22) * 0.04 + g.pointerY * -0.05
-    }
 
     webTex.needsUpdate = true
     webPlane.visible = webMat.opacity > 0.01

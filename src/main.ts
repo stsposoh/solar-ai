@@ -6,6 +6,7 @@ import { createWorld, type Glance, type ModelStatus } from './scene'
 import { createWeb } from './web'
 import { createDevice } from './device'
 import { createMetaballs } from './metaballs'
+import { createTubes } from './tubes'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -172,6 +173,7 @@ function boot() {
   const device = createDevice(must<HTMLCanvasElement>('#device'))
   const goo = createMetaballs(must<HTMLCanvasElement>('#goo'))
   let gooHover = false
+  createTubes(must<HTMLCanvasElement>('#tubes'))
   const captions = [...cinemaEl.querySelectorAll<HTMLElement>('[data-caption]')]
   const catLines = [...catsEl.querySelectorAll<HTMLElement>('[data-start]')]
   const steps = [...processEl.querySelectorAll<HTMLElement>('[data-step]')]
@@ -200,6 +202,13 @@ function boot() {
       event.clientY >= box.top &&
       event.clientY <= box.bottom
     if (gooHover) goo.setPointer(event.clientX, event.clientY)
+    const servicesBox = servicesBoard.getBoundingClientRect()
+    const overServices =
+      event.clientX >= servicesBox.left &&
+      event.clientX <= servicesBox.right &&
+      event.clientY >= servicesBox.top &&
+      event.clientY <= servicesBox.bottom
+    servicesBoard.classList.toggle('is-tubes', overServices)
   })
 
   const lenis = new Lenis({
