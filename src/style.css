@@ -191,8 +191,7 @@ main { position: relative; z-index: 1; }
 
 .marquee,
 .services,
-.awards,
-footer {
+.awards {
   background: var(--bg);
 }
 
@@ -1201,6 +1200,9 @@ footer {
   inset: 0;
   pointer-events: none;
   background: radial-gradient(circle at var(--lx) var(--ly), rgba(122, 215, 255, 0.16), transparent 46%);
+  /* Fade the cursor glow out before the section edges so it never ends in a hard line. */
+  -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 72%, transparent);
+  mask-image: linear-gradient(transparent, #000 18%, #000 72%, transparent);
 }
 
 .cta h2 {
@@ -1226,7 +1228,10 @@ footer {
 
 .cta-meta { margin: 16px 0 0; color: var(--muted); font-family: var(--mono); font-size: 13px; letter-spacing: 0.06em; }
 
+/* Sits above the fixed WebGL canvas, but lets the storm sky run on underneath. */
 footer {
+  position: relative;
+  z-index: 1;
   padding: 48px var(--pad) 36px;
   border-top: 1px solid var(--line);
 }

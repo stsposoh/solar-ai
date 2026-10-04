@@ -7,6 +7,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { createSolarLogo } from './logo'
 import { createMorph } from './morph'
 import { createBlob } from './blob'
+import { createStorm, STORM_SKY } from './storm'
 
 export type Glance = {
   hero: number
@@ -226,7 +227,8 @@ export function createWorld(
   RectAreaLightUniformsLib.init()
 
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color('#07080a')
+  const sceneBackground = new THREE.Color('#07080a')
+  scene.background = sceneBackground
   scene.environment = environment(renderer)
   scene.environmentIntensity = 1.65
 
@@ -348,58 +350,12 @@ export function createWorld(
   stars.visible = false
   scene.add(stars)
 
-  const stormScene = new THREE.Scene()
-  stormScene.fog = new THREE.FogExp2(0x11111f, 0.002)
-  const stormCam = new THREE.PerspectiveCamera(60, 1, 1, 1000)
-  stormCam.position.z = 1
-  stormCam.rotation.set(1.16, -0.12, 0.27)
-  stormScene.add(new THREE.AmbientLight(0x555555))
-  const stormDir = new THREE.DirectionalLight(0xffeedd)
-  stormDir.position.set(0, 0, 1)
-  stormScene.add(stormDir)
-  const flashBlue = new THREE.PointLight(0x062d89, 0, 240, 2)
-  flashBlue.position.set(200, 300, 100)
-  const flashWhite = new THREE.PointLight(0xffffff, 0, 120, 2)
-  flashWhite.position.copy(flashBlue.position)
-  stormScene.add(flashBlue, flashWhite)
-  let flashPower = 0
-  const rainCount = 15000
-  const rainPositions = new Float32Array(rainCount * 3)
-  const rainSizes = new Float32Array(rainCount)
-  for (let i = 0; i < rainCount; i += 1) {
-    rainPositions[i * 3] = Math.random() * 400 - 200
-    rainPositions[i * 3 + 1] = Math.random() * 500 - 250
-    rainPositions[i * 3 + 2] = Math.random() * 400 - 200
-    rainSizes[i] = 30
-  }
-  const rainGeo = new THREE.BufferGeometry()
-  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3))
-  rainGeo.setAttribute('size', new THREE.BufferAttribute(rainSizes, 1))
-  const rain = new THREE.Points(
-    rainGeo,
-    new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.1, transparent: true }),
-  )
-  stormScene.add(rain)
-  const cloudParticles: THREE.Mesh[] = []
-  new THREE.TextureLoader().load('/images/cloud-smoke.webp', (texture) => {
-    const cloudGeo = new THREE.PlaneGeometry(500, 500)
-    for (let p = 0; p < 25; p += 1) {
-      const material = new THREE.MeshLambertMaterial({
-        map: texture,
-        transparent: true,
-        opacity: 0.6,
-        depthWrite: false,
-        emissive: 0x000000,
-      })
-      const cloud = new THREE.Mesh(cloudGeo, material)
-      cloud.position.set(Math.random() * 800 - 400, 500, Math.random() * 500 - 450)
-      cloud.rotation.x = 1.16
-      cloud.rotation.y = -0.12
-      cloud.rotation.z = Math.random() * 360
-      cloudParticles.push(cloud)
-      stormScene.add(cloud)
-    }
-  })
+  const storm = createStorm()
+  // Lightning also has to land on the mark: a broad soft panel for the metal to mirror,
+  // plus a point for a hard glint, both placed on the side of the screen the bolt is on.
+  const boltPanel = new THREE.RectAreaLight('#3d8cff', 0, 6, 5)
+  const boltPoint = new THREE.PointLight('#8fe8ff', 0, 9, 1.6)
+  scene.add(boltPanel, boltPoint)
 
   const BURST_COUNT = 220
   const bursts = Array.from({ length: 5 }, () => {
@@ -517,7 +473,11 @@ export function createWorld(
 
   const composerTarget = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType })
   const composer = new EffectComposer(renderer, composerTarget)
-  composer.addPass(new RenderPass(scene, camera))
+  const stormPass = new RenderPass(storm.scene, storm.camera, undefined, new THREE.Color(STORM_SKY), 1)
+  stormPass.enabled = false
+  const mainPass = new RenderPass(scene, camera)
+  composer.addPass(stormPass)
+  composer.addPass(mainPass)
   const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.1, 0.28, 0.97)
   composer.addPass(bloom)
 
@@ -541,8 +501,7 @@ export function createWorld(
     bloom.resolution.set(width, height)
     camera.aspect = width / Math.max(height, 1)
     camera.updateProjectionMatrix()
-    stormCam.aspect = camera.aspect
-    stormCam.updateProjectionMatrix()
+    storm.resize(camera.aspect)
     fitWeb()
   }
 
@@ -733,41 +692,17 @@ export function createWorld(
     const voidOn = voidShow > 0.04
     stars.visible = voidOn
     if (voidOn) {
-      cloudParticles.forEach((cloud) => {
-        cloud.rotation.z -= 0.002
-      })
-      rain.position.z -= 0.222
-      if (rain.position.z < -200) rain.position.z = 0
-      if (Math.random() > 0.93 || flashPower > 100) {
-        if (flashPower < 100) {
-          const cloud = cloudParticles[Math.floor(Math.random() * Math.max(cloudParticles.length, 1))]
-          const x = cloud ? cloud.position.x + (Math.random() - 0.5) * 120 : Math.random() * 800 - 400
-          const y = cloud ? cloud.position.y - 30 - Math.random() * 50 : 300 + Math.random() * 200
-          const z = cloud ? cloud.position.z + 40 + Math.random() * 80 : 100
-          flashBlue.position.set(x, y, z)
-          flashWhite.position.set(x, y, z)
-        }
-        flashPower = 50 + Math.random() * 500
-      } else {
-        flashPower *= 0.68
-        if (flashPower < 8) flashPower = 0
-      }
-      flashBlue.intensity = flashPower * 7
-      flashWhite.intensity = flashPower * 3
-      cloudParticles.forEach((cloud) => {
-        const mat = cloud.material as THREE.MeshLambertMaterial
-        const far = cloud.position.distanceTo(flashBlue.position)
-        const local = Math.max(0, 1 - far / 280)
-        const bolt = Math.min(1, flashPower / 420) * local * local
-        mat.emissive.setRGB(0.2 * bolt, 0.22 * bolt, 0.58 * bolt)
-      })
+      const bolt = storm.update(dt)
+      const reach = bolt.flash * voidShow * Math.min(1, markScale * 2)
+      boltPanel.position.set(markPivot.position.x + bolt.screen.x * 1.8, markPivot.position.y + bolt.screen.y * 1.4 + 0.4, markPivot.position.z + 3.2)
+      boltPanel.lookAt(markPivot.position)
+      boltPanel.intensity = reach * 160
+      boltPoint.position.copy(boltPanel.position)
+      boltPoint.intensity = reach * 140
     } else {
-      flashPower = 0
-      flashBlue.intensity = 0
-      flashWhite.intensity = 0
-      cloudParticles.forEach((cloud) => {
-        ;(cloud.material as THREE.MeshLambertMaterial).emissive.setRGB(0, 0, 0)
-      })
+      storm.reset()
+      boltPanel.intensity = 0
+      boltPoint.intensity = 0
     }
     ;(stars.material as THREE.PointsMaterial).opacity = voidShow * (0.45 + fall * 0.55)
     if (voidOn) {
@@ -811,25 +746,13 @@ export function createWorld(
     webPlane.visible = webMat.opacity > 0.01
     if (webPlane.visible) webTex.needsUpdate = true
     if (!g.render) return
-    if (voidOn) {
-      renderer.toneMapping = THREE.NoToneMapping
-      renderer.toneMappingExposure = 1
-      renderer.autoClear = true
-      renderer.setClearColor(0x11111f, 1)
-      renderer.render(stormScene, stormCam)
-      const previous = scene.background
-      scene.background = null
-      renderer.autoClear = false
-      renderer.clearDepth()
-      renderer.toneMapping = THREE.ACESFilmicToneMapping
-      renderer.toneMappingExposure = 1.12
-      renderer.render(scene, camera)
-      renderer.autoClear = true
-      scene.background = previous
-      renderer.setClearColor(0x07080a, 1)
-    } else {
-      composer.render()
-    }
+    // The storm sky and the mark go through one composer, so lightning blooms and the mark
+    // keeps the same look it has everywhere else on the page.
+    stormPass.enabled = voidOn
+    mainPass.clear = !voidOn
+    mainPass.clearDepth = voidOn
+    scene.background = voidOn ? null : sceneBackground
+    composer.render()
     if (overlays.length) {
       renderer.autoClear = false
       renderer.setRenderTarget(null)
