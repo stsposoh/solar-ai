@@ -106,6 +106,7 @@ function boot() {
   const objectEl = must<HTMLElement>('#object')
   const closeEl = must<HTMLElement>('#contact')
   const wowEl = must<HTMLElement>('#wow')
+  const abyssEl = must<HTMLElement>('#abyss')
   const cinemaEl = must<HTMLElement>('#showreel')
   const catsEl = must<HTMLElement>('#cats')
   const manifestoEl = must<HTMLElement>('#manifesto')
@@ -272,6 +273,15 @@ function boot() {
     },
   })
 
+  ScrollTrigger.create({
+    trigger: '#abyss',
+    start: 'top top',
+    end: 'bottom bottom',
+    pin: '.abyss-pin',
+    pinSpacing: false,
+    anticipatePin: 1,
+  })
+
   const revealObserver = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
@@ -299,6 +309,11 @@ function boot() {
     const object = travel(objectEl)
     const close = travel(closeEl)
     const wow = travel(wowEl)
+    const abyss = travel(abyssEl)
+    const abyssBox = abyssEl.getBoundingClientRect()
+    const vh = window.innerHeight
+    const voidArrive = clamp((vh - abyssBox.top) / vh, 0, 1)
+    const voidLive = abyssBox.top < vh ? 1 : abyss.presence
     const cinema = travel(cinemaEl)
     const cats = travel(catsEl)
     const manifesto = travel(manifestoEl)
@@ -316,6 +331,7 @@ function boot() {
       object: object.presence,
       close: close.presence,
       wow: wow.presence,
+      void: voidLive,
       thread: cover,
       heroP: hero.p,
       dualityP: duality.p,
@@ -323,6 +339,8 @@ function boot() {
       objectP: object.p,
       closeP: close.p,
       wowP: wow.p,
+      voidP: abyss.p,
+      voidArrive,
       pointerX: pointer.x,
       pointerY: pointer.y,
       time,

@@ -758,6 +758,18 @@ footer {
 
 .way:hover { background-size: 100% 100%; }
 
+.abyss {
+  height: 1100vh;
+  background: transparent;
+}
+
+.abyss-pin {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  pointer-events: none;
+}
+
 .way span {
   font-family: var(--mono);
   font-size: 12px;

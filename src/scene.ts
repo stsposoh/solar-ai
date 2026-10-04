@@ -14,6 +14,7 @@ export type Glance = {
   object: number
   close: number
   wow: number
+  void: number
   thread: number
   heroP: number
   dualityP: number
@@ -21,6 +22,8 @@ export type Glance = {
   objectP: number
   closeP: number
   wowP: number
+  voidP: number
+  voidArrive: number
   pointerX: number
   pointerY: number
   time: number
@@ -36,14 +39,15 @@ type Shot = {
   product: number
 }
 
-const SHOTS: Record<'rest' | 'hero' | 'duality' | 'process' | 'wow' | 'object' | 'close', Shot> = {
+const SHOTS: Record<'rest' | 'hero' | 'duality' | 'process' | 'wow' | 'void' | 'object' | 'close', Shot> = {
   rest: { cam: [0.1, 0.15, 6.6], look: [0.55, 0.45, 0], mark: [1.15, 0.62, 0], markScale: 0.62, panels: 0, product: 0 },
   hero: { cam: [0.15, 0.02, 6.2], look: [0.95, 0.38, 0], mark: [1.35, 0.42, 0], markScale: 0.86, panels: 0, product: 0 },
   duality: { cam: [0, 0.04, 5.9], look: [0, 0.28, 0], mark: [0, 0.28, 0], markScale: 0.78, panels: 0, product: 0 },
   process: { cam: [-0.35, 0.18, 8.2], look: [0.15, 0.02, 0], mark: [-4, 0, 0], markScale: 0.3, panels: 0, product: 0 },
   wow: { cam: [0.85, 0.02, 6.5], look: [1.7, 0.02, 0], mark: [2.72, 0.02, 0], markScale: 0.98, panels: 0, product: 0 },
+  void: { cam: [0, 0, 5.8], look: [0, 0, 0], mark: [3.7, -2.6, 0.7], markScale: 0.08, panels: 0, product: 0 },
   object: { cam: [-0.35, 0.18, 5.8], look: [1.25, 0, 0], mark: [-3.6, -0.4, 0], markScale: 0, panels: 0, product: 1 },
-  close: { cam: [0.1, 0.12, 6.4], look: [0.35, 0.15, 0], mark: [0.55, 0.22, 0], markScale: 0.5, panels: 0, product: 0 },
+  close: { cam: [0.05, 0.08, 6.2], look: [0.85, 0.1, 0], mark: [2.48, 0.12, 0.08], markScale: 1.46, panels: 0, product: 0 },
 }
 
 function smoothstep(edge0: number, edge1: number, x: number) {
@@ -232,7 +236,7 @@ export function createWorld(
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
-    alpha: false,
+    alpha: true,
     powerPreference: 'high-performance',
   })
   renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -332,6 +336,135 @@ export function createWorld(
   form.add(formLight)
   scene.add(form)
 
+  const STAR_COUNT = 2600
+  const starPos = new Float32Array(STAR_COUNT * 3)
+  const starSeed = new Float32Array(STAR_COUNT * 3)
+  for (let i = 0; i < STAR_COUNT; i += 1) {
+    const radius = 0.8 + Math.random() * 16
+    const angle = Math.random() * Math.PI * 2
+    starSeed[i * 3] = Math.cos(angle) * radius
+    starSeed[i * 3 + 1] = Math.sin(angle) * radius
+    starSeed[i * 3 + 2] = -Math.random() * 96
+    starPos[i * 3] = starSeed[i * 3]
+    starPos[i * 3 + 1] = starSeed[i * 3 + 1]
+    starPos[i * 3 + 2] = starSeed[i * 3 + 2]
+  }
+  const starGeo = new THREE.BufferGeometry()
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3))
+  const stars = new THREE.Points(
+    starGeo,
+    new THREE.PointsMaterial({
+      color: '#e8f4ff',
+      size: 0.045,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  )
+  stars.visible = false
+  scene.add(stars)
+
+  const stormScene = new THREE.Scene()
+  stormScene.fog = new THREE.FogExp2(0x11111f, 0.002)
+  const stormCam = new THREE.PerspectiveCamera(60, 1, 1, 1000)
+  stormCam.position.z = 1
+  stormCam.rotation.set(1.16, -0.12, 0.27)
+  stormScene.add(new THREE.AmbientLight(0x555555))
+  const stormDir = new THREE.DirectionalLight(0xffeedd)
+  stormDir.position.set(0, 0, 1)
+  stormScene.add(stormDir)
+  const flashBlue = new THREE.PointLight(0x062d89, 0, 240, 2)
+  flashBlue.position.set(200, 300, 100)
+  const flashWhite = new THREE.PointLight(0xffffff, 0, 120, 2)
+  flashWhite.position.copy(flashBlue.position)
+  stormScene.add(flashBlue, flashWhite)
+  let flashPower = 0
+  const rainCount = 15000
+  const rainPositions = new Float32Array(rainCount * 3)
+  const rainSizes = new Float32Array(rainCount)
+  for (let i = 0; i < rainCount; i += 1) {
+    rainPositions[i * 3] = Math.random() * 400 - 200
+    rainPositions[i * 3 + 1] = Math.random() * 500 - 250
+    rainPositions[i * 3 + 2] = Math.random() * 400 - 200
+    rainSizes[i] = 30
+  }
+  const rainGeo = new THREE.BufferGeometry()
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3))
+  rainGeo.setAttribute('size', new THREE.BufferAttribute(rainSizes, 1))
+  const rain = new THREE.Points(
+    rainGeo,
+    new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.1, transparent: true }),
+  )
+  stormScene.add(rain)
+  const cloudParticles: THREE.Mesh[] = []
+  new THREE.TextureLoader().load('/images/cloud-smoke.png', (texture) => {
+    const cloudGeo = new THREE.PlaneGeometry(500, 500)
+    for (let p = 0; p < 25; p += 1) {
+      const material = new THREE.MeshLambertMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+        emissive: 0x000000,
+      })
+      const cloud = new THREE.Mesh(cloudGeo, material)
+      cloud.position.set(Math.random() * 800 - 400, 500, Math.random() * 500 - 450)
+      cloud.rotation.x = 1.16
+      cloud.rotation.y = -0.12
+      cloud.rotation.z = Math.random() * 360
+      cloudParticles.push(cloud)
+      stormScene.add(cloud)
+    }
+  })
+
+  const BURST_COUNT = 220
+  const bursts = Array.from({ length: 5 }, () => {
+    const positions = new Float32Array(BURST_COUNT * 3)
+    const dirs = new Float32Array(BURST_COUNT * 3)
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    const material = new THREE.PointsMaterial({
+      size: 0.07,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      color: '#e8f4ff',
+    })
+    const mesh = new THREE.Points(geometry, material)
+    mesh.visible = false
+    scene.add(mesh)
+    return { mesh, positions, dirs, material, life: 0, active: false }
+  })
+  let burstWait = 0.4
+
+  const igniteBurst = () => {
+    const burst = bursts.find((item) => !item.active)
+    if (!burst) return
+    const radius = 1.2 + Math.random() * 7
+    const angle = Math.random() * Math.PI * 2
+    const ox = Math.cos(angle) * radius
+    const oy = Math.sin(angle) * radius
+    const oz = -2 - Math.random() * 26
+    for (let i = 0; i < BURST_COUNT; i += 1) {
+      burst.positions[i * 3] = ox
+      burst.positions[i * 3 + 1] = oy
+      burst.positions[i * 3 + 2] = oz
+      burst.dirs[i * 3] = (Math.random() - 0.5) * 7.2
+      burst.dirs[i * 3 + 1] = (Math.random() - 0.5) * 7.2
+      burst.dirs[i * 3 + 2] = (Math.random() - 0.5) * 7.2
+    }
+    burst.material.color.set('#e8f4ff')
+    burst.material.opacity = 1
+    burst.life = 0
+    burst.active = true
+    burst.mesh.visible = true
+    burst.mesh.geometry.attributes.position.needsUpdate = true
+  }
+
   const panels = makePanels(renderer)
   panels.group.visible = false
   scene.add(panels.group)
@@ -407,6 +540,8 @@ export function createWorld(
     bloom.resolution.set(width, height)
     camera.aspect = width / Math.max(height, 1)
     camera.updateProjectionMatrix()
+    stormCam.aspect = camera.aspect
+    stormCam.updateProjectionMatrix()
     fitWeb()
   }
 
@@ -420,11 +555,12 @@ export function createWorld(
     smoothPointer.y += (g.pointerY - smoothPointer.y) * 0.08
 
     const weights = [
-      { w: Math.max(0, 1 - (g.hero + g.duality + g.process + g.wow + g.object + g.close)), shot: SHOTS.rest },
+      { w: Math.max(0, 1 - (g.hero + g.duality + g.process + g.wow + g.void + g.object + g.close)), shot: SHOTS.rest },
       { w: g.hero, shot: SHOTS.hero },
       { w: g.duality, shot: SHOTS.duality },
       { w: g.process, shot: SHOTS.process },
       { w: g.wow, shot: SHOTS.wow },
+      { w: g.void * 3.4, shot: SHOTS.void },
       { w: g.object, shot: SHOTS.object },
       { w: g.close, shot: SHOTS.close },
     ]
@@ -438,13 +574,31 @@ export function createWorld(
       weights.map((entry) => ({ w: entry.w, v: entry.shot.mark })),
       markTarget,
     )
-    const markScale =
+    const voidShow = g.void
+    const fall = Math.pow(smoothstep(0.42, 1, g.voidP), 1.15)
+    let markScale =
       mixScalar(weights.map((entry) => ({ w: entry.w, v: entry.shot.markScale }))) *
       (0.94 + 0.06 * smoothstep(0, 1.05, elapsed)) *
-      (1 - smoothstep(0.12, 0.72, g.thread))
+      (1 - smoothstep(0.12, 0.72, g.thread) * (1 - voidShow))
     const panelAmt = mixScalar(weights.map((entry) => ({ w: entry.w, v: entry.shot.panels })))
     const productAmt = mixScalar(weights.map((entry) => ({ w: entry.w, v: entry.shot.product })))
+    if (voidShow > 0.04) {
+      const arrive = g.voidArrive
+      markTarget.set(3.7 * (1 - arrive), -2.6 * (1 - arrive), 0.7 - arrive * 0.35 - fall * 36)
+      markScale = 0.06 + arrive * (0.78 * (1 - fall * 0.08) - 0.06)
+      const closeAmt = Math.max(g.close, g.closeP > 0.92 ? 1 : 0)
+      if (closeAmt > 0.01) {
+        markTarget.set(
+          markTarget.x + (2.48 - markTarget.x) * closeAmt,
+          markTarget.y + (0.12 - markTarget.y) * closeAmt,
+          markTarget.z + (0.08 - markTarget.z) * closeAmt,
+        )
+        markScale += (1.46 - markScale) * closeAmt
+      }
+    }
 
+    const closeAmt = Math.max(g.close, g.closeP > 0.92 ? 1 : 0)
+    const moveK = voidShow > 0.04 && closeAmt < 0.02 ? 1 : k
     if (!primed) {
       camera.position.copy(camTarget)
       lookCur.copy(lookTarget)
@@ -452,11 +606,11 @@ export function createWorld(
       markPivot.scale.setScalar(Math.max(markScale, 0.001))
       primed = true
     } else {
-      camera.position.lerp(camTarget, k)
-      lookCur.lerp(lookTarget, k)
-      markPivot.position.lerp(markTarget, k)
+      camera.position.lerp(camTarget, moveK)
+      lookCur.lerp(lookTarget, moveK)
+      markPivot.position.lerp(markTarget, moveK)
       const current = markPivot.scale.x
-      const next = current + (markScale - current) * k
+      const next = current + (markScale - current) * moveK
       markPivot.scale.setScalar(Math.max(next, 0.001))
     }
     camera.lookAt(lookCur)
@@ -466,9 +620,22 @@ export function createWorld(
     const dualityBeat = g.duality > 0.45 ? Math.min(2, Math.floor(Math.min(1, Math.max(0, g.dualityP)) * 3)) : 0
     const yawTarget = dualityBeat === 1 ? -0.78 : dualityBeat === 2 ? 0.82 : 0
     dualityYaw += (yawTarget - dualityYaw) * (1 - Math.exp(-2.8 * dt))
-    markTilt.rotation.x = 0.48 + smoothPointer.y * -0.04
-    markTilt.rotation.y = -0.34 + smoothPointer.x * 0.05 + dualityYaw
-    markSpin.rotation.z = elapsed * 0.11 + g.heroP * 0.35 + g.dualityP * 0.85 + g.processP * 0.4 + g.wowP * 0.55
+    if (voidShow > 0.08) {
+      markTilt.rotation.x = Math.sin(elapsed * 0.22) * 0.2
+      markTilt.rotation.y = Math.cos(elapsed * 0.18) * 0.22
+      markTilt.rotation.z = Math.sin(elapsed * 0.15) * 0.08
+      markSpin.rotation.x = 0
+      markSpin.rotation.y = 0
+      markSpin.rotation.z = elapsed * 0.06
+    } else {
+      markPivot.rotation.set(0, 0, 0)
+      markTilt.rotation.x = 0.48 + smoothPointer.y * -0.04
+      markTilt.rotation.y = -0.34 + smoothPointer.x * 0.05 + dualityYaw
+      markTilt.rotation.z = 0
+      markSpin.rotation.x = 0
+      markSpin.rotation.y = 0
+      markSpin.rotation.z = elapsed * 0.11 + g.heroP * 0.35 + g.dualityP * 0.85 + g.processP * 0.4 + g.wowP * 0.55
+    }
 
     const coolBoost = g.duality > 0.25 ? 1.2 - g.dualityP * 0.75 : 1
     const hotBoost = g.duality > 0.25 ? 0.35 + g.dualityP * 0.95 : 1
@@ -527,9 +694,105 @@ export function createWorld(
     productKey.intensity = showProduct ? 36 * productAmt : 0
     productKey.target.position.copy(product.position)
 
+    const voidOn = voidShow > 0.04
+    stars.visible = voidOn
+    if (voidOn) {
+      cloudParticles.forEach((cloud) => {
+        cloud.rotation.z -= 0.002
+      })
+      rain.position.z -= 0.222
+      if (rain.position.z < -200) rain.position.z = 0
+      if (Math.random() > 0.93 || flashPower > 100) {
+        if (flashPower < 100) {
+          const cloud = cloudParticles[Math.floor(Math.random() * Math.max(cloudParticles.length, 1))]
+          const x = cloud ? cloud.position.x + (Math.random() - 0.5) * 120 : Math.random() * 800 - 400
+          const y = cloud ? cloud.position.y - 30 - Math.random() * 50 : 300 + Math.random() * 200
+          const z = cloud ? cloud.position.z + 40 + Math.random() * 80 : 100
+          flashBlue.position.set(x, y, z)
+          flashWhite.position.set(x, y, z)
+        }
+        flashPower = 50 + Math.random() * 500
+      } else {
+        flashPower *= 0.68
+        if (flashPower < 8) flashPower = 0
+      }
+      flashBlue.intensity = flashPower * 7
+      flashWhite.intensity = flashPower * 3
+      cloudParticles.forEach((cloud) => {
+        const mat = cloud.material as THREE.MeshLambertMaterial
+        const far = cloud.position.distanceTo(flashBlue.position)
+        const local = Math.max(0, 1 - far / 280)
+        const bolt = Math.min(1, flashPower / 420) * local * local
+        mat.emissive.setRGB(0.2 * bolt, 0.22 * bolt, 0.58 * bolt)
+      })
+    } else {
+      flashPower = 0
+      flashBlue.intensity = 0
+      flashWhite.intensity = 0
+      cloudParticles.forEach((cloud) => {
+        ;(cloud.material as THREE.MeshLambertMaterial).emissive.setRGB(0, 0, 0)
+      })
+    }
+    ;(stars.material as THREE.PointsMaterial).opacity = voidShow * (0.45 + fall * 0.55)
+    if (voidOn) {
+      const rush = Math.pow(g.voidP, 2.6)
+      const drift = (0.08 + rush * 26) * dt
+      const pos = starGeo.attributes.position as THREE.BufferAttribute
+      for (let i = 0; i < STAR_COUNT; i += 1) {
+        let z = pos.getZ(i) + drift
+        if (z > 4) z -= 100
+        pos.setXYZ(i, starSeed[i * 3], starSeed[i * 3 + 1], z)
+      }
+      pos.needsUpdate = true
+      burstWait -= dt
+      if (burstWait <= 0) {
+        igniteBurst()
+        burstWait = 0.7 + Math.random() * 0.9
+      }
+    } else {
+      burstWait = 0.2
+    }
+    bursts.forEach((burst) => {
+      if (!burst.active) return
+      burst.life += dt
+      const done = burst.life > 1.45 || !voidOn
+      if (done) {
+        burst.active = false
+        burst.mesh.visible = false
+        burst.material.opacity = 0
+        return
+      }
+      const speed = dt * (1.15 - burst.life * 0.35)
+      for (let i = 0; i < BURST_COUNT; i += 1) {
+        burst.positions[i * 3] += burst.dirs[i * 3] * speed
+        burst.positions[i * 3 + 1] += burst.dirs[i * 3 + 1] * speed
+        burst.positions[i * 3 + 2] += burst.dirs[i * 3 + 2] * speed
+      }
+      burst.material.opacity = Math.max(0, 1 - burst.life / 1.45)
+      burst.mesh.geometry.attributes.position.needsUpdate = true
+    })
+
     webTex.needsUpdate = true
     webPlane.visible = webMat.opacity > 0.01
-    composer.render()
+    if (voidOn) {
+      renderer.toneMapping = THREE.NoToneMapping
+      renderer.toneMappingExposure = 1
+      renderer.autoClear = true
+      renderer.setClearColor(0x11111f, 1)
+      renderer.render(stormScene, stormCam)
+      const previous = scene.background
+      scene.background = null
+      renderer.autoClear = false
+      renderer.clearDepth()
+      renderer.toneMapping = THREE.ACESFilmicToneMapping
+      renderer.toneMappingExposure = 1.12
+      renderer.render(scene, camera)
+      renderer.autoClear = true
+      scene.background = previous
+      renderer.setClearColor(0x07080a, 1)
+    } else {
+      composer.render()
+    }
   }
 
   const setWebOpacity = (opacity: number) => {
