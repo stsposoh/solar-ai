@@ -192,7 +192,6 @@ main { position: relative; z-index: 1; }
 .marquee,
 .services,
 .ways,
-.stack,
 .awards,
 .industries,
 footer {
@@ -528,20 +527,183 @@ footer {
   padding: 0 var(--pad);
 }
 
-.wow-copy { min-width: 0; position: relative; z-index: 1; }
+.wow-copy { min-width: 0; position: relative; z-index: 1; --lx: 28%; --ly: 42%; }
+
+.wow-copy::after {
+  content: '';
+  position: absolute;
+  inset: -18% -12%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--lx) var(--ly), rgba(122, 215, 255, 0.28), rgba(255, 77, 60, 0.12) 42%, transparent 68%);
+  transition: background 0.08s linear;
+}
 
 .wow h2 {
   max-width: 100%;
   font-size: clamp(72px, 8vw, 140px);
   line-height: 0.84;
   letter-spacing: -0.06em;
-  background: linear-gradient(100deg, var(--cool) 0%, #f7f8fa 46%, var(--hot) 100%);
+  background: radial-gradient(120% 90% at var(--lx) var(--ly), var(--cool) 0%, #f7f8fa 44%, var(--hot) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .wow .lede { margin-top: 28px; max-width: 28rem; font-size: 20px; }
+
+.feel {
+  height: 340vh;
+}
+
+.feel-pin {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 var(--pad);
+  overflow: hidden;
+}
+
+.feel-line {
+  margin: 0;
+  font-size: clamp(56px, 7.2vw, 128px);
+  line-height: 0.92;
+  letter-spacing: -0.055em;
+}
+
+.feel-char {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+.cases {
+  height: 380vh;
+  background: var(--bg);
+}
+
+.cases-pin {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.cases-pin canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cases-copy {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 34vw);
+  padding: 18vh var(--pad) 0;
+  pointer-events: none;
+}
+
+.cases-copy h2 {
+  margin: 0;
+  font-size: clamp(44px, 4.4vw, 78px);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.cases-copy .lede { margin-top: 18px; color: var(--muted); }
+
+.cases-index {
+  list-style: none;
+  margin: 36px 0 0;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.cases-index li {
+  padding: 8px 0;
+  color: var(--muted);
+  opacity: 0.4;
+  transition: opacity 0.3s ease, color 0.3s ease;
+}
+
+.cases-index li.is-on {
+  opacity: 1;
+  color: var(--cool);
+}
+
+.corridor {
+  background: transparent;
+}
+
+.corridor-pin {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  perspective: 1600px;
+  padding: 14vh 0 0;
+}
+
+.corridor-copy {
+  position: absolute;
+  z-index: 2;
+  left: var(--pad);
+  top: 16vh;
+  width: min(420px, 32vw);
+  pointer-events: none;
+}
+
+.corridor-copy h2 {
+  margin: 0;
+  font-size: clamp(40px, 4vw, 72px);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.corridor-track {
+  display: flex;
+  align-items: center;
+  gap: 6vw;
+  height: 100%;
+  width: max-content;
+  padding-left: 42vw;
+  padding-right: 18vw;
+  transform-style: preserve-3d;
+}
+
+.corridor-card {
+  flex: none;
+  width: min(38vw, 520px);
+  height: 58vh;
+  padding: 36px 32px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(160deg, rgba(18, 22, 30, 0.88), rgba(8, 10, 14, 0.72));
+  transform: rotateY(-22deg) translateZ(-80px);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+}
+
+.corridor-card span {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--cool);
+}
+
+.corridor-card h3 {
+  margin: 28px 0 16px;
+  font-size: clamp(36px, 3.4vw, 56px);
+  letter-spacing: -0.045em;
+}
+
+.corridor-card p { margin: 0; color: var(--muted); font-size: 18px; }
 
 .process { height: auto; }
 
@@ -947,11 +1109,22 @@ footer {
 }
 
 .cta {
+  position: relative;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   padding: 0 var(--pad) 72px;
+  --lx: 70%;
+  --ly: 40%;
+}
+
+.cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--lx) var(--ly), rgba(122, 215, 255, 0.16), transparent 46%);
 }
 
 .cta h2 {

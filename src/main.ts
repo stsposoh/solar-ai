@@ -7,6 +7,8 @@ import { createWeb } from './web'
 import { createDevice } from './device'
 import { createMetaballs } from './metaballs'
 import { createTubes } from './tubes'
+import { createCases } from './cases'
+import { createKinetic } from './kinetic'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -106,6 +108,9 @@ function boot() {
   const objectEl = must<HTMLElement>('#object')
   const closeEl = must<HTMLElement>('#contact')
   const wowEl = must<HTMLElement>('#wow')
+  const feelEl = must<HTMLElement>('#feel')
+  const casesEl = must<HTMLElement>('#work')
+  const corridorEl = must<HTMLElement>('#corridor')
   const abyssEl = must<HTMLElement>('#abyss')
   const cinemaEl = must<HTMLElement>('#showreel')
   const catsEl = must<HTMLElement>('#cats')
@@ -175,6 +180,11 @@ function boot() {
   const goo = createMetaballs(must<HTMLCanvasElement>('#goo'))
   let gooHover = false
   createTubes(must<HTMLCanvasElement>('#tubes'))
+  const kinetic = createKinetic(feelEl)
+  const cases = createCases(must<HTMLCanvasElement>('#cases'))
+  const caseItems = [...casesEl.querySelectorAll<HTMLElement>('[data-case]')]
+  const corridorTrack = must<HTMLElement>('#corridor-track')
+  const corridorCards = [...corridorEl.querySelectorAll<HTMLElement>('.corridor-card')]
   const captions = [...cinemaEl.querySelectorAll<HTMLElement>('[data-caption]')]
   const catLines = [...catsEl.querySelectorAll<HTMLElement>('[data-start]')]
   const steps = [...processEl.querySelectorAll<HTMLElement>('[data-step]')]
@@ -192,10 +202,12 @@ function boot() {
     }
   })
 
-  const pointer = { x: 0, y: 0 }
+  const pointer = { x: 0, y: 0, clientX: 0, clientY: 0 }
   window.addEventListener('pointermove', (event) => {
     pointer.x = (event.clientX / window.innerWidth) * 2 - 1
     pointer.y = (event.clientY / window.innerHeight) * 2 - 1
+    pointer.clientX = event.clientX
+    pointer.clientY = event.clientY
     const box = threadEl.getBoundingClientRect()
     gooHover =
       event.clientX >= box.left &&
@@ -273,6 +285,28 @@ function boot() {
     },
   })
 
+  const corridorSpan = () => Math.max(0, corridorTrack.scrollWidth - window.innerWidth)
+  gsap.to(corridorTrack, {
+    x: () => -corridorSpan(),
+    ease: 'none',
+    scrollTrigger: {
+      trigger: '#corridor',
+      start: 'top top',
+      end: () => `+=${corridorSpan() * 1.15}`,
+      pin: '.corridor-pin',
+      scrub: 0.9,
+      invalidateOnRefresh: true,
+      anticipatePin: 1,
+    },
+  })
+
+  ScrollTrigger.create({
+    trigger: '#feel',
+    start: 'top top',
+    end: 'bottom bottom',
+    onUpdate: (self) => kinetic.set(self.progress),
+  })
+
   ScrollTrigger.create({
     trigger: '#abyss',
     start: 'top top',
@@ -309,6 +343,8 @@ function boot() {
     const object = travel(objectEl)
     const close = travel(closeEl)
     const wow = travel(wowEl)
+    const feel = travel(feelEl)
+    const casesTravel = travel(casesEl)
     const abyss = travel(abyssEl)
     const abyssBox = abyssEl.getBoundingClientRect()
     const vh = window.innerHeight
@@ -332,6 +368,9 @@ function boot() {
       close: close.presence,
       wow: wow.presence,
       void: voidLive,
+      feel: feel.presence,
+      cases: casesTravel.presence,
+      corridor: travel(corridorEl).presence,
       thread: cover,
       heroP: hero.p,
       dualityP: duality.p,
@@ -349,6 +388,25 @@ function boot() {
     web.update()
     world.setWebOpacity(hero.presence)
     world.update(glance)
+    kinetic.set(feel.p)
+    cases.update(casesTravel.p, casesTravel.presence > 0.04, pointer.x, pointer.y)
+    const caseIndex = Math.min(3, Math.floor(casesTravel.p * 3.99))
+    caseItems.forEach((el) => el.classList.toggle('is-on', Number(el.dataset.case) === caseIndex))
+    if (wow.presence > 0.05) {
+      const box = wowEl.getBoundingClientRect()
+      wowEl.style.setProperty('--lx', `${(((pointer.clientX - box.left) / Math.max(box.width, 1)) * 100).toFixed(1)}%`)
+      wowEl.style.setProperty('--ly', `${(((pointer.clientY - box.top) / Math.max(box.height, 1)) * 100).toFixed(1)}%`)
+    }
+    if (close.presence > 0.05) {
+      const box = closeEl.getBoundingClientRect()
+      closeEl.style.setProperty('--lx', `${(((pointer.clientX - box.left) / Math.max(box.width, 1)) * 100).toFixed(1)}%`)
+      closeEl.style.setProperty('--ly', `${(((pointer.clientY - box.top) / Math.max(box.height, 1)) * 100).toFixed(1)}%`)
+    }
+    corridorCards.forEach((card) => {
+      const box = card.getBoundingClientRect()
+      const nx = (box.left + box.width / 2) / window.innerWidth * 2 - 1
+      card.style.transform = `rotateY(${(-20 - nx * 12).toFixed(2)}deg) translateZ(${(-70 + Math.abs(nx) * 36).toFixed(0)}px)`
+    })
 
     const max = document.documentElement.scrollHeight - window.innerHeight
     progress.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`
@@ -440,6 +498,7 @@ function boot() {
     web.resize()
     device.resize()
     goo.resize()
+    cases.resize()
     layoutThread()
     ScrollTrigger.refresh()
   })

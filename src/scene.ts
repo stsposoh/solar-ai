@@ -15,6 +15,9 @@ export type Glance = {
   close: number
   wow: number
   void: number
+  feel: number
+  cases: number
+  corridor: number
   thread: number
   heroP: number
   dualityP: number
@@ -307,7 +310,9 @@ export function createWorld(
   const markFill = new THREE.PointLight('#ff1a12', 14, 0, 2)
   markFill.position.set(-0.35, 1.15, 1.9)
   markFill.layers.set(1)
-  markPivot.add(markKey, markRim, markFill)
+  const handLight = new THREE.PointLight('#7ad7ff', 0, 6.5, 1.8)
+  handLight.layers.set(1)
+  markPivot.add(markKey, markRim, markFill, handLight)
 
   const solar = solarForm()
   const formCount = solar.targets.length
@@ -596,6 +601,11 @@ export function createWorld(
         markScale += (1.46 - markScale) * closeAmt
       }
     }
+    markScale *= 1 - Math.max(g.feel, g.cases)
+    if (voidShow > 0.04) {
+      const hideCorridor = (1 - Math.max(g.close, g.closeP > 0.92 ? 1 : 0)) * g.corridor
+      markScale *= 1 - hideCorridor
+    }
 
     const closeAmt = Math.max(g.close, g.closeP > 0.92 ? 1 : 0)
     const moveK = voidShow > 0.04 && closeAmt < 0.02 ? 1 : k
@@ -613,9 +623,15 @@ export function createWorld(
       const next = current + (markScale - current) * moveK
       markPivot.scale.setScalar(Math.max(next, 0.001))
     }
+    markPivot.visible = markScale > 0.05
     camera.lookAt(lookCur)
     markKey.lookAt(markPivot.position)
     markRim.lookAt(markPivot.position)
+    const handAmt = Math.max(g.wow, g.close * 0.9) * (1 - Math.max(g.feel, g.cases))
+    const handMix = smoothPointer.x * 0.5 + 0.5
+    handLight.intensity = 70 * handAmt
+    handLight.color.setRGB(0.48 + 0.52 * handMix, 0.62 - 0.18 * handMix, 1 - 0.62 * handMix)
+    handLight.position.set(smoothPointer.x * 2.35, smoothPointer.y * 1.7, 1.75)
 
     const dualityBeat = g.duality > 0.45 ? Math.min(2, Math.floor(Math.min(1, Math.max(0, g.dualityP)) * 3)) : 0
     const yawTarget = dualityBeat === 1 ? -0.78 : dualityBeat === 2 ? 0.82 : 0
