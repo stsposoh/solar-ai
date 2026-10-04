@@ -90,10 +90,12 @@ export function createCases(canvas: HTMLCanvasElement) {
   const update = (progress: number, visible: boolean, pointerX: number, pointerY: number) => {
     if (!visible) return
     const x = progress * gap * (LABELS.length - 1)
-    camera.position.x = x
+    // Keep the active screen right of the copy column.
+    const eye = x - 0.82
+    camera.position.x = eye
     camera.position.y = 0.1 + Math.sin(progress * Math.PI) * 0.08
-    camera.lookAt(x + 0.55, 0.02, -0.2)
-    mouse.set(x + pointerX * 2.8, -pointerY * 1.55)
+    camera.lookAt(eye + 0.18, 0.02, -0.2)
+    mouse.set(eye + pointerX * 2.5, -pointerY * 1.55)
     const amp = 0.55 + Math.abs(pointerX) * 0.35
     materials.forEach((material) => {
       material.uniforms.uAmp.value = amp

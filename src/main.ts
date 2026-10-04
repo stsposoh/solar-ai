@@ -6,9 +6,9 @@ import { createWorld, type Glance, type ModelStatus } from './scene'
 import { createWeb } from './web'
 import { createDevice } from './device'
 import { createMetaballs } from './metaballs'
-import { createTubes } from './tubes'
 import { createCases } from './cases'
 import { createKinetic } from './kinetic'
+import { createGallery } from './gallery'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -20,13 +20,54 @@ function must<T extends Element>(selector: string): T {
   return el
 }
 
-function travel(el: HTMLElement) {
+type Travel = { p: number; presence: number; rect: DOMRect }
+
+function travel(el: HTMLElement): Travel {
   const rect = el.getBoundingClientRect()
   const vh = window.innerHeight
   const p = clamp(-rect.top / Math.max(el.offsetHeight - vh, vh), 0, 1)
   const visible = Math.min(rect.bottom, vh) - Math.max(rect.top, 0)
   const presence = clamp(visible / Math.min(el.offsetHeight, vh), 0, 1)
-  return { p, presence }
+  return { p, presence, rect }
+}
+
+function inside(rect: DOMRect, x: number, y: number) {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+}
+
+// Run once, a little before the element scrolls into view.
+function whenNear(el: Element, margin: string, run: () => void) {
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+      observer.disconnect()
+      run()
+    },
+    { rootMargin: margin },
+  )
+  observer.observe(el)
+}
+
+// Seeking a video every frame queues decodes faster than the browser can finish them.
+// Keep one seek in flight and jump straight to the latest target when it lands.
+function createScrubber(video: HTMLVideoElement) {
+  let busy = false
+  let target = 0
+  const seek = (time: number) => {
+    target = time
+    if (busy || Math.abs(video.currentTime - time) < 1 / 60) return
+    busy = true
+    video.addEventListener(
+      'seeked',
+      () => {
+        busy = false
+        if (Math.abs(video.currentTime - target) >= 1 / 60) seek(target)
+      },
+      { once: true },
+    )
+    video.currentTime = time
+  }
+  return seek
 }
 
 function catmullRom(points: { x: number; y: number }[], tension = 6) {
@@ -65,7 +106,7 @@ function serpentine(width: number, y0: number, y1: number) {
     const span = bottom - top
     const forward = index % 2 === 0
     const dir = forward ? 1 : -1
-    const cx = width * (forward ? 0.5 : 0.5)
+    const cx = width * 0.5
     const cy = top + span * 0.46
     const rx = Math.min(width * 0.2, span * 0.42)
     const ry = rx * 0.92
@@ -86,24 +127,13 @@ function boot() {
   const progress = must<HTMLElement>('#progress')
   const video = must<HTMLVideoElement>('#reel')
   const catsVideo = must<HTMLVideoElement>('#cats-reel')
-  let catsBusy = false
-  let catsTarget = 0
-  const scrubCats = (time: number) => {
-    catsTarget = time
-    if (catsBusy || Math.abs(catsVideo.currentTime - time) < 1 / 60) return
-    catsBusy = true
-    catsVideo.addEventListener(
-      'seeked',
-      () => {
-        catsBusy = false
-        if (Math.abs(catsVideo.currentTime - catsTarget) >= 1 / 60) scrubCats(catsTarget)
-      },
-      { once: true },
-    )
-    catsVideo.currentTime = time
-  }
+  const scrubReel = createScrubber(video)
+  const scrubCats = createScrubber(catsVideo)
   const heroEl = must<HTMLElement>('#top')
   const dualityEl = must<HTMLElement>('#duality')
+  const morphEl = must<HTMLElement>('#morph')
+  const servicesEl = must<HTMLElement>('#services')
+  const materialEl = must<HTMLElement>('#material')
   const processEl = must<HTMLElement>('#process')
   const objectEl = must<HTMLElement>('#object')
   const closeEl = must<HTMLElement>('#contact')
@@ -112,6 +142,8 @@ function boot() {
   const casesEl = must<HTMLElement>('#work')
   const corridorEl = must<HTMLElement>('#corridor')
   const abyssEl = must<HTMLElement>('#abyss')
+  const awardsEl = must<HTMLElement>('#awards')
+  const industriesEl = must<HTMLElement>('#industries')
   const cinemaEl = must<HTMLElement>('#showreel')
   const catsEl = must<HTMLElement>('#cats')
   const manifestoEl = must<HTMLElement>('#manifesto')
@@ -178,8 +210,6 @@ function boot() {
   const servicesBoard = must<HTMLElement>('.services-board')
   const device = createDevice(must<HTMLCanvasElement>('#device'))
   const goo = createMetaballs(must<HTMLCanvasElement>('#goo'))
-  let gooHover = false
-  createTubes(must<HTMLCanvasElement>('#tubes'))
   const kinetic = createKinetic(feelEl)
   const cases = createCases(must<HTMLCanvasElement>('#cases'))
   const caseItems = [...casesEl.querySelectorAll<HTMLElement>('[data-case]')]
@@ -189,8 +219,14 @@ function boot() {
   const catLines = [...catsEl.querySelectorAll<HTMLElement>('[data-start]')]
   const steps = [...processEl.querySelectorAll<HTMLElement>('[data-step]')]
   const phases = [...objectEl.querySelectorAll<HTMLElement>('[data-phase]')]
+  const morphSteps = [...morphEl.querySelectorAll<HTMLElement>('[data-morph]')]
+  const looks = [...materialEl.querySelectorAll<HTMLElement>('[data-look]')]
   const reelTime = must<HTMLElement>('#reel-time')
   const phaseLabel = must<HTMLElement>('#phase-label')
+  const industryStage = must<HTMLElement>('.industries-stage')
+  const industryTitle = must<HTMLElement>('.industries-title')
+  const industryCards = [...industryStage.querySelectorAll<HTMLElement>('.ind-card')]
+  const gallery = createGallery(industryCards)
 
   let models: ModelStatus = { camera: false, boombox: false }
   const web = createWeb()
@@ -201,27 +237,22 @@ function boot() {
       if (second) second.textContent = 'Keep scrolling. The same object finishes the turn in the light.'
     }
   })
+  world.addOverlay(gallery.render)
 
-  const pointer = { x: 0, y: 0, clientX: 0, clientY: 0 }
+  whenNear(objectEl, '250% 0px', world.loadModels)
+  whenNear(cinemaEl, '150% 0px', () => { video.preload = 'auto' })
+  whenNear(catsEl, '150% 0px', () => { catsVideo.preload = 'auto' })
+  // The tubes cursor ships its own WebGPU build of three, so it only loads when needed.
+  whenNear(servicesEl, '150% 0px', () => {
+    void import('./tubes').then(({ createTubes }) => createTubes(must<HTMLCanvasElement>('#tubes')))
+  })
+
+  const pointer = { x: 0, y: 0, clientX: -9999, clientY: -9999 }
   window.addEventListener('pointermove', (event) => {
     pointer.x = (event.clientX / window.innerWidth) * 2 - 1
     pointer.y = (event.clientY / window.innerHeight) * 2 - 1
     pointer.clientX = event.clientX
     pointer.clientY = event.clientY
-    const box = threadEl.getBoundingClientRect()
-    gooHover =
-      event.clientX >= box.left &&
-      event.clientX <= box.right &&
-      event.clientY >= box.top &&
-      event.clientY <= box.bottom
-    if (gooHover) goo.setPointer(event.clientX, event.clientY)
-    const servicesBox = servicesBoard.getBoundingClientRect()
-    const overServices =
-      event.clientX >= servicesBox.left &&
-      event.clientX <= servicesBox.right &&
-      event.clientY >= servicesBox.top &&
-      event.clientY <= servicesBox.bottom
-    servicesBoard.classList.toggle('is-tubes', overServices)
   })
 
   const lenis = new Lenis({
@@ -241,32 +272,6 @@ function boot() {
       event.preventDefault()
       lenis.scrollTo(target, { offset: 0 })
     })
-  })
-
-  const industryStage = must<HTMLElement>('.industries-stage')
-  const industryCards = [...industryStage.querySelectorAll<HTMLElement>('.ind-card')]
-  const tiltCard = (card: HTMLElement, event: PointerEvent | null) => {
-    if (!event) {
-      card.style.setProperty('--tilt-x', '0deg')
-      card.style.setProperty('--tilt-y', '0deg')
-      card.style.setProperty('--shift-x', '0px')
-      card.style.setProperty('--shift-y', '0px')
-      return
-    }
-    const rect = card.getBoundingClientRect()
-    const dx = (event.clientX - (rect.left + rect.width / 2)) / rect.width
-    const dy = (event.clientY - (rect.top + rect.height / 2)) / rect.height
-    const near = Math.hypot(dx, dy) < 1.05
-    card.style.setProperty('--tilt-x', near ? `${(-dy * 7).toFixed(2)}deg` : '0deg')
-    card.style.setProperty('--tilt-y', near ? `${(dx * 9).toFixed(2)}deg` : '0deg')
-    card.style.setProperty('--shift-x', near ? `${(-dx * 14).toFixed(1)}px` : '0px')
-    card.style.setProperty('--shift-y', near ? `${(-dy * 10).toFixed(1)}px` : '0px')
-  }
-  industryStage.addEventListener('pointermove', (event) => {
-    industryCards.forEach((card) => tiltCard(card, event))
-  })
-  industryStage.addEventListener('pointerleave', () => {
-    industryCards.forEach((card) => tiltCard(card, null))
   })
 
   const track = must<HTMLElement>('#industries-track')
@@ -300,22 +305,6 @@ function boot() {
     },
   })
 
-  ScrollTrigger.create({
-    trigger: '#feel',
-    start: 'top top',
-    end: 'bottom bottom',
-    onUpdate: (self) => kinetic.set(self.progress),
-  })
-
-  ScrollTrigger.create({
-    trigger: '#abyss',
-    start: 'top top',
-    end: 'bottom bottom',
-    pin: '.abyss-pin',
-    pinSpacing: false,
-    anticipatePin: 1,
-  })
-
   const revealObserver = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
@@ -332,13 +321,26 @@ function boot() {
     if (video.currentTime < 0.04) video.currentTime = 0.04
   })
 
+  const toggleOne = (items: HTMLElement[], active: number) => {
+    items.forEach((el, index) => el.classList.toggle('is-on', index === active))
+  }
+
   let last = -1
+  let reelLabel = ''
+  let feelSet = -1
   const step = (time: number) => {
     const dt = last < 0 ? 0.016 : time - last
     last = time
+    const vh = window.innerHeight
+    const vw = window.innerWidth
 
+    // Read phase: every layout query for the frame happens before any style write,
+    // so the browser lays out once instead of once per section.
     const hero = travel(heroEl)
     const duality = travel(dualityEl)
+    const morph = travel(morphEl)
+    const services = travel(servicesEl)
+    const material = travel(materialEl)
     const process = travel(processEl)
     const object = travel(objectEl)
     const close = travel(closeEl)
@@ -346,19 +348,49 @@ function boot() {
     const feel = travel(feelEl)
     const casesTravel = travel(casesEl)
     const abyss = travel(abyssEl)
-    const abyssBox = abyssEl.getBoundingClientRect()
-    const vh = window.innerHeight
-    const voidArrive = clamp((vh - abyssBox.top) / vh, 0, 1)
-    const voidLive = abyssBox.top < vh ? 1 : abyss.presence
+    const corridor = travel(corridorEl)
+    const awards = travel(awardsEl)
+    const industries = travel(industriesEl)
     const cinema = travel(cinemaEl)
     const cats = travel(catsEl)
     const manifesto = travel(manifestoEl)
     const thread = travel(threadEl)
-    const threadBox = threadEl.getBoundingClientRect()
-    const leave = clamp((window.innerHeight - threadBox.bottom) / (window.innerHeight * 0.9), 0, 1)
+    const manifestoTop = manifestoEl.getBoundingClientRect().top
+    const board = servicesBoard.getBoundingClientRect()
+    const serviceRects = services.presence > 0 ? serviceBlocks.map((article) => article.getBoundingClientRect()) : []
+    const corridorRects = corridor.presence > 0 ? corridorCards.map((card) => card.getBoundingClientRect()) : []
+    const industryRects = industries.presence > 0 ? industryCards.map((card) => card.getBoundingClientRect()) : []
+    const titleRight = industries.presence > 0 ? industryTitle.getBoundingClientRect().right : 0
+    const statRects = thread.presence > 0 ? statItems.map((item) => item.getBoundingClientRect()) : []
+    const scrollMax = document.documentElement.scrollHeight - vh
+    const scrollY = window.scrollY
+
+    const voidArrive = clamp((vh - abyss.rect.top) / vh, 0, 1)
+    const voidLive = abyss.rect.top < vh ? 1 : abyss.presence
+    const leave = clamp((vh - thread.rect.bottom) / (vh * 0.9), 0, 1)
     const cover = Math.max(0, thread.presence * (1 - leave))
-    threadEl.style.setProperty('--veil', cover.toFixed(3))
-    goo.update(time, cover, thread.p, gooHover)
+    const hidden = Math.max(services.presence, cinema.presence, casesTravel.presence, awards.presence, cats.presence, industries.presence)
+    const backdrop = Math.max(
+      hero.presence,
+      thread.presence,
+      duality.presence,
+      morph.presence,
+      wow.presence,
+      feel.presence,
+      material.presence,
+      process.presence,
+      object.presence,
+      industries.presence,
+      abyss.presence,
+      corridor.presence,
+      close.presence,
+    )
+
+    // Write phase.
+    const overThread = inside(thread.rect, pointer.clientX, pointer.clientY)
+    if (overThread) goo.setPointer(pointer.clientX, pointer.clientY)
+    goo.update(time, cover, thread.p, overThread)
+    servicesBoard.classList.toggle('is-tubes', inside(board, pointer.clientX, pointer.clientY))
 
     const glance: Glance = {
       hero: hero.presence,
@@ -370,12 +402,21 @@ function boot() {
       void: voidLive,
       feel: feel.presence,
       cases: casesTravel.presence,
-      corridor: travel(corridorEl).presence,
-      thread: cover,
+      corridor: corridor.presence,
+      thread: thread.presence,
+      morph: morph.presence,
+      morphP: morph.p,
+      blob: material.presence,
+      blobP: material.p,
+      industries: industries.presence,
+      cover: hidden,
+      energy: Math.abs(lenis.velocity) / 30,
+      render: backdrop > 0,
       heroP: hero.p,
       dualityP: duality.p,
       processP: process.p,
       objectP: object.p,
+      objectLeave: clamp((vh - object.rect.bottom) / vh, 0, 1),
       closeP: close.p,
       wowP: wow.p,
       voidP: abyss.p,
@@ -385,34 +426,50 @@ function boot() {
       time,
       dt,
     }
-    web.update()
+    if (hero.presence > 0) web.update()
     world.setWebOpacity(hero.presence)
+    if (industries.presence > 0) {
+      const fades = gallery.update({
+        rects: industryRects,
+        pointerX: pointer.clientX,
+        pointerY: pointer.clientY,
+        velocity: lenis.velocity,
+        time,
+        dt,
+        fadeX: titleRight,
+      })
+      industryCards.forEach((card, index) => card.style.setProperty('--fade', fades[index].toFixed(3)))
+    } else {
+      gallery.update({ rects: [], pointerX: 0, pointerY: 0, velocity: 0, time, dt, fadeX: 0 })
+    }
     world.update(glance)
-    kinetic.set(feel.p)
+
+    if (feel.presence > 0 || feelSet !== 0) {
+      kinetic.set(feel.p)
+      feelSet = feel.presence > 0 ? 1 : 0
+    }
     cases.update(casesTravel.p, casesTravel.presence > 0.04, pointer.x, pointer.y)
-    const caseIndex = Math.min(3, Math.floor(casesTravel.p * 3.99))
-    caseItems.forEach((el) => el.classList.toggle('is-on', Number(el.dataset.case) === caseIndex))
+    toggleOne(caseItems, Math.min(3, Math.floor(casesTravel.p * 3.99)))
+    toggleOne(morphSteps, Math.round(clamp(morph.p, 0, 0.9999) * (morphSteps.length - 1)))
+    toggleOne(looks, Math.round(clamp(material.p, 0, 1) * (looks.length - 1)))
+
     if (wow.presence > 0.05) {
-      const box = wowEl.getBoundingClientRect()
-      wowEl.style.setProperty('--lx', `${(((pointer.clientX - box.left) / Math.max(box.width, 1)) * 100).toFixed(1)}%`)
-      wowEl.style.setProperty('--ly', `${(((pointer.clientY - box.top) / Math.max(box.height, 1)) * 100).toFixed(1)}%`)
+      wowEl.style.setProperty('--lx', `${(((pointer.clientX - wow.rect.left) / Math.max(wow.rect.width, 1)) * 100).toFixed(1)}%`)
+      wowEl.style.setProperty('--ly', `${(((pointer.clientY - wow.rect.top) / Math.max(wow.rect.height, 1)) * 100).toFixed(1)}%`)
     }
     if (close.presence > 0.05) {
-      const box = closeEl.getBoundingClientRect()
-      closeEl.style.setProperty('--lx', `${(((pointer.clientX - box.left) / Math.max(box.width, 1)) * 100).toFixed(1)}%`)
-      closeEl.style.setProperty('--ly', `${(((pointer.clientY - box.top) / Math.max(box.height, 1)) * 100).toFixed(1)}%`)
+      closeEl.style.setProperty('--lx', `${(((pointer.clientX - close.rect.left) / Math.max(close.rect.width, 1)) * 100).toFixed(1)}%`)
+      closeEl.style.setProperty('--ly', `${(((pointer.clientY - close.rect.top) / Math.max(close.rect.height, 1)) * 100).toFixed(1)}%`)
     }
-    corridorCards.forEach((card) => {
-      const box = card.getBoundingClientRect()
-      const nx = (box.left + box.width / 2) / window.innerWidth * 2 - 1
-      card.style.transform = `rotateY(${(-20 - nx * 12).toFixed(2)}deg) translateZ(${(-70 + Math.abs(nx) * 36).toFixed(0)}px)`
+    corridorRects.forEach((box, index) => {
+      const nx = ((box.left + box.width / 2) / vw) * 2 - 1
+      corridorCards[index].style.transform = `rotateY(${(-20 - nx * 12).toFixed(2)}deg) translateZ(${(-70 + Math.abs(nx) * 36).toFixed(0)}px)`
     })
 
-    const max = document.documentElement.scrollHeight - window.innerHeight
-    progress.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`
+    progress.style.transform = `scaleX(${scrollMax > 0 ? scrollY / scrollMax : 0})`
     nav.classList.toggle('is-ink', cinema.presence > 0.55 || cats.presence > 0.4)
 
-    const rise = clamp((window.innerHeight * 0.78 - manifestoEl.getBoundingClientRect().top) / (window.innerHeight * 0.42), 0, 1)
+    const rise = clamp((vh * 0.78 - manifestoTop) / (vh * 0.42), 0, 1)
     manifestoEl.style.setProperty('--rise', rise.toFixed(3))
     const line = Math.min(lines.length - 1, Math.floor(manifesto.p * lines.length))
     lines.forEach((el, index) => {
@@ -420,18 +477,15 @@ function boot() {
       el.classList.toggle('is-on', showFirst || (index === line && index > 0 && manifesto.presence > 0.05))
     })
 
-    const board = servicesBoard.getBoundingClientRect()
-    const deviceProgress = clamp((window.innerHeight * 0.35 - board.top) / Math.max(board.height - window.innerHeight, 1), 0, 1)
-    const deviceVisible = board.bottom > 0 && board.top < window.innerHeight
-    device.update(deviceProgress, deviceVisible)
-    serviceBlocks.forEach((article) => {
-      const rect = article.getBoundingClientRect()
-      article.classList.toggle('is-live', rect.top < window.innerHeight * 0.46 && rect.bottom > window.innerHeight * 0.46)
+    const deviceProgress = clamp((vh * 0.35 - board.top) / Math.max(board.height - vh, 1), 0, 1)
+    device.update(deviceProgress, board.bottom > 0 && board.top < vh)
+    serviceRects.forEach((rect, index) => {
+      serviceBlocks[index].classList.toggle('is-live', rect.top < vh * 0.46 && rect.bottom > vh * 0.46)
     })
 
-    if (threadLength > 1) {
-      const root = threadEl.getBoundingClientRect()
-      const along = clamp((window.innerHeight * 0.42 - root.top) / Math.max(threadEl.offsetHeight - window.innerHeight * 0.2, 1), 0, 1)
+    if (threadLength > 1 && thread.presence > 0) {
+      const root = thread.rect
+      const along = clamp((vh * 0.42 - root.top) / Math.max(root.height - vh * 0.2, 1), 0, 1)
       const drawn = threadLength * along
       const offset = String(threadLength - drawn)
       threadGlow.style.strokeDashoffset = offset
@@ -442,38 +496,32 @@ function boot() {
       threadHalo.setAttribute('cx', String(point.x))
       threadHalo.setAttribute('cy', String(point.y))
       const screenY = point.y + root.top
-      const lit = along > 0.012 && along < 0.992 && screenY > 24 && screenY < window.innerHeight - 16
+      const lit = along > 0.012 && along < 0.992 && screenY > 24 && screenY < vh - 16
       threadHead.style.opacity = lit ? '1' : '0'
       threadHalo.style.opacity = lit ? '0.9' : '0'
-      statItems.forEach((item) => {
-        const rect = item.getBoundingClientRect()
+      statRects.forEach((rect, index) => {
         const x = rect.left - root.left + rect.width / 2
         const y = rect.top - root.top + rect.height * 0.34
-        item.classList.toggle('is-hot', lit && Math.hypot(point.x - x, point.y - y) < 150)
+        statItems[index].classList.toggle('is-hot', lit && Math.hypot(point.x - x, point.y - y) < 150)
       })
     }
 
-    const beat = Math.min(2, Math.floor(duality.p * 3))
-    dualityEl.dataset.beat = String(beat)
-
-    const stepIndex = Math.min(steps.length - 1, Math.floor(process.p * steps.length))
-    steps.forEach((el, index) => el.classList.toggle('is-on', index === stepIndex))
+    dualityEl.dataset.beat = String(Math.min(2, Math.floor(duality.p * 3)))
+    toggleOne(steps, Math.min(steps.length - 1, Math.floor(process.p * steps.length)))
 
     const phase = models.camera && models.boombox && object.p >= 0.52 ? 1 : 0
     phases.forEach((el) => el.classList.toggle('is-on', Number(el.dataset.phase) === phase))
     phaseLabel.textContent = phase === 0 ? '01  Camera' : '02  Signal'
 
-    const caption = Math.min(captions.length - 1, Math.floor(cinema.p * captions.length))
-    captions.forEach((el, index) => el.classList.toggle('is-on', index === caption))
+    toggleOne(captions, Math.min(captions.length - 1, Math.floor(cinema.p * captions.length)))
     if (video.duration && cinema.presence > 0.05) {
-      const target = Math.min(video.duration - 0.05, Math.max(0.04, cinema.p * video.duration))
-      if (Math.abs(video.currentTime - target) > 0.045) video.currentTime = target
-      reelTime.textContent = `${(cinema.p * video.duration).toFixed(1)}s`
+      scrubReel(Math.min(video.duration - 0.05, Math.max(0.04, cinema.p * video.duration)))
+      const label = `${(cinema.p * video.duration).toFixed(1)}s`
+      if (label !== reelLabel) reelTime.textContent = reelLabel = label
     }
 
     if (catsVideo.duration && cats.presence > 0.05) {
-      const target = Math.min(catsVideo.duration - 0.05, Math.max(0, cats.p * catsVideo.duration))
-      scrubCats(target)
+      scrubCats(Math.min(catsVideo.duration - 0.05, Math.max(0, cats.p * catsVideo.duration)))
       const moment = cats.p * catsVideo.duration
       catLines.forEach((el) => {
         const start = Number(el.dataset.start)
@@ -493,15 +541,17 @@ function boot() {
   })
   gsap.ticker.lagSmoothing(0)
 
-  window.addEventListener('resize', () => {
+  const resizeAll = () => {
     world.resize()
     web.resize()
     device.resize()
     goo.resize()
     cases.resize()
+    gallery.resize(window.innerWidth, window.innerHeight)
     layoutThread()
     ScrollTrigger.refresh()
-  })
+  }
+  window.addEventListener('resize', resizeAll)
   window.addEventListener('load', () => {
     layoutThread()
     ScrollTrigger.refresh()
@@ -510,6 +560,7 @@ function boot() {
     layoutThread()
     ScrollTrigger.refresh()
   })
+  gallery.resize(window.innerWidth, window.innerHeight)
   layoutThread()
 }
 

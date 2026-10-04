@@ -5,7 +5,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { createSolarLogo } from './logo'
-import { createScreenCanvas } from './screens'
+import { createMorph } from './morph'
+import { createBlob } from './blob'
 
 export type Glance = {
   hero: number
@@ -19,10 +20,19 @@ export type Glance = {
   cases: number
   corridor: number
   thread: number
+  morph: number
+  morphP: number
+  blob: number
+  blobP: number
+  industries: number
+  cover: number
+  energy: number
+  render: boolean
   heroP: number
   dualityP: number
   processP: number
   objectP: number
+  objectLeave: number
   closeP: number
   wowP: number
   voidP: number
@@ -38,19 +48,22 @@ type Shot = {
   look: [number, number, number]
   mark: [number, number, number]
   markScale: number
-  panels: number
   product: number
 }
 
-const SHOTS: Record<'rest' | 'hero' | 'duality' | 'process' | 'wow' | 'void' | 'object' | 'close', Shot> = {
-  rest: { cam: [0.1, 0.15, 6.6], look: [0.55, 0.45, 0], mark: [1.15, 0.62, 0], markScale: 0.62, panels: 0, product: 0 },
-  hero: { cam: [0.15, 0.02, 6.2], look: [0.95, 0.38, 0], mark: [1.35, 0.42, 0], markScale: 0.86, panels: 0, product: 0 },
-  duality: { cam: [0, 0.04, 5.9], look: [0, 0.28, 0], mark: [0, 0.28, 0], markScale: 0.78, panels: 0, product: 0 },
-  process: { cam: [-0.35, 0.18, 8.2], look: [0.15, 0.02, 0], mark: [-4, 0, 0], markScale: 0.3, panels: 0, product: 0 },
-  wow: { cam: [0.85, 0.02, 6.5], look: [1.7, 0.02, 0], mark: [2.72, 0.02, 0], markScale: 0.98, panels: 0, product: 0 },
-  void: { cam: [0, 0, 5.8], look: [0, 0, 0], mark: [3.7, -2.6, 0.7], markScale: 0.08, panels: 0, product: 0 },
-  object: { cam: [-0.35, 0.18, 5.8], look: [1.25, 0, 0], mark: [-3.6, -0.4, 0], markScale: 0, panels: 0, product: 1 },
-  close: { cam: [0.05, 0.08, 6.2], look: [0.85, 0.1, 0], mark: [2.48, 0.12, 0.08], markScale: 1.46, panels: 0, product: 0 },
+const SHOTS: Record<'rest' | 'hero' | 'thread' | 'duality' | 'morph' | 'blob' | 'process' | 'wow' | 'void' | 'object' | 'close', Shot> = {
+  rest: { cam: [0.1, 0.15, 6.6], look: [0.55, 0.45, 0], mark: [1.15, 0.62, 0], markScale: 0.62, product: 0 },
+  hero: { cam: [0.15, 0.02, 6.2], look: [0.95, 0.38, 0], mark: [1.35, 0.42, 0], markScale: 0.86, product: 0 },
+  // Leaving the hero, the mark drifts down and to the right into the studio section.
+  thread: { cam: [0.15, 0.02, 6.2], look: [0.95, 0.38, 0], mark: [2.55, -0.55, 0], markScale: 0.6, product: 0 },
+  duality: { cam: [0, 0.04, 5.9], look: [0, 0.28, 0], mark: [0, 0.28, 0], markScale: 0.78, product: 0 },
+  morph: { cam: [0.2, 0.05, 6.4], look: [0.75, 0, 0], mark: [-3.4, 0.2, 0], markScale: 0, product: 0 },
+  blob: { cam: [0.25, 0.02, 6.1], look: [0.8, 0, 0], mark: [-3.4, 0.2, 0], markScale: 0, product: 0 },
+  process: { cam: [-0.35, 0.18, 8.2], look: [0.15, 0.02, 0], mark: [-4, 0, 0], markScale: 0.3, product: 0 },
+  wow: { cam: [0.85, 0.02, 6.5], look: [1.7, 0.02, 0], mark: [2.72, 0.02, 0], markScale: 0.98, product: 0 },
+  void: { cam: [0, 0, 5.8], look: [0, 0, 0], mark: [3.7, -2.6, 0.7], markScale: 0.08, product: 0 },
+  object: { cam: [-0.35, 0.18, 5.8], look: [1.25, 0, 0], mark: [-3.6, -0.4, 0], markScale: 0, product: 1 },
+  close: { cam: [0.05, 0.08, 6.2], look: [0.85, 0.1, 0], mark: [2.48, 0.12, 0.08], markScale: 1.46, product: 0 },
 }
 
 function smoothstep(edge0: number, edge1: number, x: number) {
@@ -191,42 +204,6 @@ function markRoom(renderer: THREE.WebGLRenderer) {
   const map = pmrem.fromScene(env, 0).texture
   pmrem.dispose()
   return map
-}
-
-function makePanels(renderer: THREE.WebGLRenderer) {
-  const group = new THREE.Group()
-  const layouts = [
-    { x: 2.55, y: 0.35, z: 0.2, ry: -0.55, w: 1.45, h: 0.9, kind: 0 },
-    { x: 3.45, y: -0.15, z: -0.35, ry: -0.7, w: 1.15, h: 0.74, kind: 1 },
-    { x: 2.85, y: -0.85, z: 0.55, ry: -0.4, w: 1.25, h: 0.78, kind: 2 },
-    { x: 3.7, y: 0.75, z: 0.05, ry: -0.85, w: 0.55, h: 1.0, kind: 3 },
-    { x: 2.15, y: 1.05, z: -0.45, ry: -0.35, w: 1.05, h: 0.66, kind: 4 },
-  ]
-  const maxAniso = renderer.capabilities.getMaxAnisotropy()
-  const bases: { mesh: THREE.Mesh; y: number; z: number }[] = []
-
-  layouts.forEach((layout) => {
-    const canvas = createScreenCanvas(layout.kind)
-    const tex = new THREE.CanvasTexture(canvas)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.anisotropy = maxAniso
-    const material = new THREE.MeshStandardMaterial({
-      map: tex,
-      roughness: 0.42,
-      metalness: 0.04,
-      emissive: new THREE.Color('#ffffff'),
-      emissiveMap: tex,
-      emissiveIntensity: 0.18,
-    })
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(layout.w, layout.h), material)
-    mesh.position.set(layout.x, layout.y, layout.z)
-    mesh.rotation.y = layout.ry
-    mesh.rotation.x = -0.06
-    group.add(mesh)
-    bases.push({ mesh, y: layout.y, z: layout.z })
-  })
-
-  return { group, bases }
 }
 
 export type ModelStatus = { camera: boolean; boombox: boolean }
@@ -404,7 +381,7 @@ export function createWorld(
   )
   stormScene.add(rain)
   const cloudParticles: THREE.Mesh[] = []
-  new THREE.TextureLoader().load('/images/cloud-smoke.png', (texture) => {
+  new THREE.TextureLoader().load('/images/cloud-smoke.webp', (texture) => {
     const cloudGeo = new THREE.PlaneGeometry(500, 500)
     for (let p = 0; p < 25; p += 1) {
       const material = new THREE.MeshLambertMaterial({
@@ -470,9 +447,23 @@ export function createWorld(
     burst.mesh.geometry.attributes.position.needsUpdate = true
   }
 
-  const panels = makePanels(renderer)
-  panels.group.visible = false
-  scene.add(panels.group)
+  const morph = createMorph(renderer)
+  morph.group.position.set(1.45, 0, 0)
+  morph.group.scale.setScalar(0.86)
+  scene.add(morph.group)
+
+  const blob = createBlob()
+  blob.group.position.set(1.5, 0, 0)
+  scene.add(blob.group)
+
+  const raycaster = new THREE.Raycaster()
+  const ndc = new THREE.Vector2()
+  const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0)
+  const hit = new THREE.Vector3()
+  const morphCursor = new THREE.Vector3()
+  const blobCursor = new THREE.Vector3()
+  let pointerSeen = false
+  const overlays: ((renderer: THREE.WebGLRenderer) => void)[] = []
 
   const product = new THREE.Group()
   product.visible = false
@@ -516,8 +507,13 @@ export function createWorld(
     )
   }
 
-  loadModel('/models/camera.glb', cameraHolder, 2.35, 'camera')
-  loadModel('/models/boombox.glb', boomHolder, 1.55, 'boombox')
+  let modelsRequested = false
+  const loadModels = () => {
+    if (modelsRequested) return
+    modelsRequested = true
+    loadModel('/models/camera.glb', cameraHolder, 2.35, 'camera')
+    loadModel('/models/boombox.glb', boomHolder, 1.55, 'boombox')
+  }
 
   const composerTarget = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType })
   const composer = new EffectComposer(renderer, composerTarget)
@@ -560,9 +556,12 @@ export function createWorld(
     smoothPointer.y += (g.pointerY - smoothPointer.y) * 0.08
 
     const weights = [
-      { w: Math.max(0, 1 - (g.hero + g.duality + g.process + g.wow + g.void + g.object + g.close)), shot: SHOTS.rest },
+      { w: Math.max(0, 1 - (g.hero + g.thread + g.duality + g.morph + g.blob + g.process + g.wow + g.void + g.object + g.close + g.cover)), shot: SHOTS.rest },
       { w: g.hero, shot: SHOTS.hero },
+      { w: g.thread, shot: SHOTS.thread },
       { w: g.duality, shot: SHOTS.duality },
+      { w: g.morph, shot: SHOTS.morph },
+      { w: g.blob, shot: SHOTS.blob },
       { w: g.process, shot: SHOTS.process },
       { w: g.wow, shot: SHOTS.wow },
       { w: g.void * 3.4, shot: SHOTS.void },
@@ -584,8 +583,7 @@ export function createWorld(
     let markScale =
       mixScalar(weights.map((entry) => ({ w: entry.w, v: entry.shot.markScale }))) *
       (0.94 + 0.06 * smoothstep(0, 1.05, elapsed)) *
-      (1 - smoothstep(0.12, 0.72, g.thread) * (1 - voidShow))
-    const panelAmt = mixScalar(weights.map((entry) => ({ w: entry.w, v: entry.shot.panels })))
+      (1 - smoothstep(0.6, 1, g.thread) * (1 - voidShow))
     const productAmt = mixScalar(weights.map((entry) => ({ w: entry.w, v: entry.shot.product })))
     if (voidShow > 0.04) {
       const arrive = g.voidArrive
@@ -601,7 +599,7 @@ export function createWorld(
         markScale += (1.46 - markScale) * closeAmt
       }
     }
-    markScale *= 1 - Math.max(g.feel, g.cases)
+    markScale *= 1 - smoothstep(0.3, 0.8, Math.max(g.feel, g.cases, g.cover, g.morph, g.blob))
     if (voidShow > 0.04) {
       const hideCorridor = (1 - Math.max(g.close, g.closeP > 0.92 ? 1 : 0)) * g.corridor
       markScale *= 1 - hideCorridor
@@ -634,8 +632,17 @@ export function createWorld(
     handLight.position.set(smoothPointer.x * 2.35, smoothPointer.y * 1.7, 1.75)
 
     const dualityBeat = g.duality > 0.45 ? Math.min(2, Math.floor(Math.min(1, Math.max(0, g.dualityP)) * 3)) : 0
-    const yawTarget = dualityBeat === 1 ? -0.78 : dualityBeat === 2 ? 0.82 : 0
+    const yawTarget = dualityBeat === 1 ? -0.3 : dualityBeat === 2 ? 0.32 : 0
     dualityYaw += (yawTarget - dualityYaw) * (1 - Math.exp(-2.8 * dt))
+    // Duality beats: the turned mark catches cold light on the left, warm light on the right.
+    const side = THREE.MathUtils.clamp(dualityYaw / 0.31, -1, 1)
+    const sideAmt = smoothstep(0.3, 0.8, g.duality) * Math.abs(side) * (1 - handAmt)
+    if (sideAmt > 0.01) {
+      handLight.intensity = 85 * sideAmt
+      if (side < 0) handLight.color.set('#7ad7ff')
+      else handLight.color.set('#ffb4a2')
+      handLight.position.set(side * -1.1, 0.7, 1.7)
+    }
     if (voidShow > 0.08) {
       markTilt.rotation.x = Math.sin(elapsed * 0.22) * 0.2
       markTilt.rotation.y = Math.cos(elapsed * 0.18) * 0.22
@@ -687,17 +694,30 @@ export function createWorld(
       })
     }
 
-    panels.group.visible = panelAmt > 0.04
-    panels.bases.forEach((item, index) => {
-      item.mesh.position.y = item.y + Math.sin(elapsed * 0.45 + index) * 0.035 + (g.processP - 0.5) * (0.18 + index * 0.04)
-      item.mesh.position.z = item.z + (g.processP - 0.5) * 0.55
-    })
-    panels.group.scale.setScalar(0.82 + panelAmt * 0.18)
+    if (g.pointerX !== 0 || g.pointerY !== 0) pointerSeen = true
+    ndc.set(g.pointerX, -g.pointerY)
+    raycaster.setFromCamera(ndc, camera)
+    const aimed = pointerSeen && raycaster.ray.intersectPlane(plane, hit) !== null
+    if (g.morph > 0.01) {
+      morph.group.updateMatrixWorld()
+      if (aimed) morph.group.worldToLocal(morphCursor.copy(hit))
+      morph.update({ time: g.time, dt, progress: g.morphP, presence: g.morph, cursor: morphCursor, cursorOn: aimed ? 1 : 0 })
+    } else {
+      morph.update({ time: g.time, dt, progress: g.morphP, presence: 0, cursor: morphCursor, cursorOn: 0 })
+    }
+    if (g.blob > 0.01 && aimed) {
+      blobCursor.copy(hit).sub(blob.group.position)
+    }
+    const blobNear = aimed ? Math.max(0, 1 - Math.hypot(blobCursor.x, blobCursor.y) / 2.4) : 0
+    blob.update({ time: g.time, dt, progress: g.blobP, presence: g.blob, energy: g.energy, cursor: blobCursor, cursorOn: blobNear })
 
     const showProduct = productAmt > 0.04 && (status.camera || status.boombox)
     product.visible = showProduct
     product.scale.setScalar(productAmt)
+    // Once the section scrolls off, the product rides up with it instead of hovering over the next one.
     product.position.set(1.35, -0.05, 0)
+    const viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.distanceTo(product.position)
+    product.position.y += g.objectLeave * viewHeight
     product.rotation.y = g.objectP * Math.PI * 2.15 + smoothPointer.x * 0.35
     product.rotation.x = smoothPointer.y * -0.12
 
@@ -788,8 +808,9 @@ export function createWorld(
       burst.mesh.geometry.attributes.position.needsUpdate = true
     })
 
-    webTex.needsUpdate = true
     webPlane.visible = webMat.opacity > 0.01
+    if (webPlane.visible) webTex.needsUpdate = true
+    if (!g.render) return
     if (voidOn) {
       renderer.toneMapping = THREE.NoToneMapping
       renderer.toneMappingExposure = 1
@@ -809,6 +830,16 @@ export function createWorld(
     } else {
       composer.render()
     }
+    if (overlays.length) {
+      renderer.autoClear = false
+      renderer.setRenderTarget(null)
+      overlays.forEach((draw) => draw(renderer))
+      renderer.autoClear = true
+    }
+  }
+
+  const addOverlay = (draw: (renderer: THREE.WebGLRenderer) => void) => {
+    overlays.push(draw)
   }
 
   const setWebOpacity = (opacity: number) => {
@@ -817,5 +848,5 @@ export function createWorld(
 
   resize()
 
-  return { update, resize, setWebOpacity }
+  return { update, resize, setWebOpacity, addOverlay, loadModels }
 }

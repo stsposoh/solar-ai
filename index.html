@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Solar Digital — Software you can feel</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -147,6 +148,22 @@
         </div>
       </section>
 
+      <section class="morph" id="morph">
+        <div class="morph-stage">
+          <div class="morph-copy">
+            <p class="eyebrow">From noise to form</p>
+            <h2>Every brief starts as a cloud.</h2>
+            <ol class="morph-steps">
+              <li data-morph="0" class="is-on"><span>01</span><strong>Noise</strong><small>Opinions, references, a deadline.</small></li>
+              <li data-morph="1"><span>02</span><strong>Shape</strong><small>Discovery finds the edges.</small></li>
+              <li data-morph="2"><span>03</span><strong>System</strong><small>Every part pulls on every other.</small></li>
+              <li data-morph="3"><span>04</span><strong>Brand</strong><small>Then it settles into something yours.</small></li>
+            </ol>
+            <p class="tech">65,536 particles · GPGPU simulation · curl noise · push them with the cursor</p>
+          </div>
+        </div>
+      </section>
+
       <section class="services" id="services">
         <header class="section-intro reveal">
           <p class="eyebrow">Services</p>
@@ -236,6 +253,22 @@
         </div>
       </section>
 
+      <section class="material" id="material">
+        <div class="material-stage">
+          <div class="material-copy">
+            <p class="eyebrow">Motion as a material</p>
+            <h2>Not a video. A surface that answers back.</h2>
+            <ol class="material-looks">
+              <li data-look="0" class="is-on">Chrome</li>
+              <li data-look="1">Glass</li>
+              <li data-look="2">Heat</li>
+            </ol>
+            <p class="lede">Scroll changes the matter. Speed agitates it. The cursor pulls it toward you.</p>
+            <p class="tech">Vertex-shader deformation · 3D simplex noise · 250k vertices, every frame</p>
+          </div>
+        </div>
+      </section>
+
       <section class="process" id="process">
         <div class="process-layout">
           <div class="process-sticky">
@@ -301,7 +334,7 @@
                 src="/media/interface.mp4"
                 muted
                 playsinline
-                preload="auto"
+                preload="metadata"
                 aria-label="Scroll-scrubbed sequence of glass interfaces"
               ></video>
             </div>
@@ -325,6 +358,7 @@
           <div class="industries-title">
             <p class="eyebrow">Industries</p>
             <h2>Deep in the work, not beside it.</h2>
+            <p class="tech">WebGL ripple · RGB split · cards bend with scroll speed</p>
           </div>
           <div class="industries-track" id="industries-track">
             <article class="ind-card">
@@ -394,32 +428,10 @@
         <div class="abyss-pin"></div>
       </section>
 
-      <section class="ways" id="ways">
-        <header class="section-intro reveal">
-          <p class="eyebrow">Models of work</p>
-          <h2>How we sit with a client.</h2>
-        </header>
-        <article class="way">
-          <span>01</span>
-          <h3>Time and materials</h3>
-          <p>The scope moves, the team stays. You pay for the work as it becomes clear.</p>
-        </article>
-        <article class="way">
-          <span>02</span>
-          <h3>Dedicated team</h3>
-          <p>Designers and engineers inside your week, not a ticket queue on the outside.</p>
-        </article>
-        <article class="way">
-          <span>03</span>
-          <h3>Project-based</h3>
-          <p>A defined build, a cross-functional group, a date you can put in a calendar.</p>
-        </article>
-      </section>
-
       <section class="corridor" id="corridor">
         <div class="corridor-pin">
           <div class="corridor-copy">
-            <p class="eyebrow">Corridor</p>
+            <p class="eyebrow">Models of work · Stack</p>
             <h2>How we sit.<br />What we build with.</h2>
           </div>
           <div class="corridor-track" id="corridor-track">
@@ -477,7 +489,7 @@
             src="/media/cats.mp4?v=60"
             muted
             playsinline
-            preload="auto"
+            preload="metadata"
             aria-label="Cat sequence played by scrolling"
           ></video>
           <div class="cats-copy">

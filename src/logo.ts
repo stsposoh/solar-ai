@@ -86,7 +86,7 @@ function extrude(commands: Command[]) {
   return geometry
 }
 
-export function createSolarLogo(envMap: THREE.Texture) {
+export function createLogoGeometry() {
   const parts = MIRRORS.map(([sx, sy]) => extrude(ribbonCommands(sx, sy)))
   const geometry = mergeGeometries(parts, false)
   parts.forEach((part) => part.dispose())
@@ -99,7 +99,11 @@ export function createSolarLogo(envMap: THREE.Texture) {
   const scale = SIZE / Math.max(size.x, size.y, size.z)
   geometry.translate(-center.x, -center.y, -center.z)
   geometry.scale(scale, scale, scale)
+  return geometry
+}
 
+export function createSolarLogo(envMap: THREE.Texture) {
+  const geometry = createLogoGeometry()
   const material = new THREE.MeshPhysicalMaterial({
     color: '#18080a',
     metalness: 1,

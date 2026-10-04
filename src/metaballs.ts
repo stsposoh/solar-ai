@@ -112,7 +112,9 @@ void main() {
   float px = 2.4 / max(uResolution.y, 1.0);
   float cover = 1.0 - smoothstep(0.0, px * 3.2, closest);
   if (t < 0.0) {
-    gl_FragColor = vec4(mix(bg, vec3(0.55, 0.07, 0.05), cover * 0.55), 1.0);
+    // Empty space stays transparent (premultiplied), so the page behind shows through.
+    vec3 rim = vec3(0.55, 0.07, 0.05) * cover * 0.55;
+    gl_FragColor = vec4(glow + rim, clamp(halo * 0.62 + cover * 0.55, 0.0, 1.0));
     return;
   }
   vec3 color = mix(bg, shade(ro, rd, t), max(cover, 0.88));
@@ -125,10 +127,10 @@ export function createMetaballs(canvas: HTMLCanvasElement) {
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: false,
-    alpha: false,
+    alpha: true,
     powerPreference: 'high-performance',
   })
-  renderer.setClearColor(0x07080a, 1)
+  renderer.setClearColor(0x000000, 0)
   const scene = new THREE.Scene()
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   const material = new THREE.ShaderMaterial({
@@ -160,7 +162,8 @@ export function createMetaballs(canvas: HTMLCanvasElement) {
     const width = canvas.clientWidth
     const height = canvas.clientHeight
     if (width < 2 || height < 2) return
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6))
+    // Soft ray-marched blobs survive upscaling; full-res marching is the most expensive pass on the page.
+    renderer.setPixelRatio(Math.max(0.75, Math.min(window.devicePixelRatio || 1, 2) * 0.5))
     renderer.setSize(width, height, false)
     material.uniforms.uResolution.value.set(width * renderer.getPixelRatio(), height * renderer.getPixelRatio())
   }
