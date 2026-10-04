@@ -15,7 +15,7 @@ export function createDevice(canvas: HTMLCanvasElement) {
   pmrem.dispose()
 
   const camera = new THREE.PerspectiveCamera(28, 1, 0.05, 40)
-  camera.position.set(0, 0, 4.8)
+  camera.position.set(0, 0, 5.15)
 
   const key = new THREE.DirectionalLight('#fff6f0', 2.6)
   key.position.set(2.4, 3.4, 4.2)
@@ -138,7 +138,7 @@ export function createDevice(canvas: HTMLCanvasElement) {
     pivot.rotation.y = yaw
     pivot.rotation.x = pitch
     const front = Math.max(0, Math.cos(yaw)) * (1 - Math.min(1, Math.abs(pitch - 0.14)))
-    camera.position.z = 6.3 - front * 1.9
+    camera.position.z = 6.3 - front * 1.15
     camera.lookAt(0, 0.02, 0)
     renderer.render(scene, camera)
   }
